@@ -1,0 +1,8 @@
+{
+  "name": "Remix: Oracle Signal v2",
+  "description": "The Gateway Portal to the Enigmatic Universe of Abysssum and the War Witch Sirens, with a unified Freight UXI diegetic cockpit deck representing live resource minting, combat telemetry, neural operative rosters, and stripe-linked gas APIs.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

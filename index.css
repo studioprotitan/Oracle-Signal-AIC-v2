@@ -1,0 +1,269 @@
+/* Custom CSS Variables */
+:root {
+  --color-brand-cyan: #00f2fe;
+  --color-brand-purple: #9b51e0;
+}
+
+/* Custom Utilities for the Genesis Console */
+.glass-panel {
+  background: rgba(5, 5, 5, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8),
+              inset 0 1px 1px rgba(255, 255, 255, 0.05);
+}
+
+.glass-panel-accent {
+  background: rgba(5, 5, 5, 0.85);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(0, 242, 254, 0.2);
+  box-shadow: 0 10px 40px 0 rgba(0, 242, 254, 0.1);
+}
+
+/* Water Reflection Shader simulation */
+.reflection-source {
+  position: relative;
+}
+
+.water-reflection {
+  transform: scaleY(-0.35) translateY(10%);
+  filter: blur(6px) brightness(0.6) contrast(1.2);
+  opacity: 0.45;
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0) 80%);
+  -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0) 80%);
+}
+
+.water-ripples {
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(255, 255, 255, 0) 0px,
+    rgba(255, 255, 255, 0) 4px,
+    rgba(0, 242, 254, 0.05) 5px,
+    rgba(255, 255, 255, 0) 6px
+  );
+  animation: ripple 8s linear infinite;
+  background-size: 100% 200%;
+}
+
+@keyframes ripple {
+  0% { background-position: 0% 0%; }
+  100% { background-position: 0% -100%; }
+}
+
+/* Glowing text and UI */
+.glow-cyan {
+  text-shadow: 0 0 10px rgba(0, 242, 254, 0.6), 0 0 20px rgba(0, 242, 254, 0.2);
+}
+
+.glow-purple {
+  text-shadow: 0 0 10px rgba(155, 81, 224, 0.6), 0 0 20px rgba(155, 81, 224, 0.2);
+}
+
+.box-glow-cyan {
+  box-shadow: 0 0 15px rgba(0, 242, 254, 0.3);
+}
+
+.box-glow-purple {
+  box-shadow: 0 0 15px rgba(155, 81, 224, 0.3);
+}
+
+/* Scanlines overlay */
+.scanlines {
+  background: linear-gradient(
+    rgba(18, 16, 16, 0) 50%, 
+    rgba(0, 0, 0, 0.25) 50%
+  );
+  background-size: 100% 4px;
+}
+
+/* CRT monitor active beam line overlay */
+.crt-moving-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 120px;
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 242, 254, 0) 0%,
+    rgba(0, 242, 254, 0.04) 15%,
+    rgba(0, 242, 254, 0.12) 50%,
+    rgba(0, 242, 254, 0.04) 85%,
+    rgba(0, 242, 254, 0) 100%
+  );
+  animation: scanline-anim 6s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes scanline-anim {
+  0% {
+    top: -120px;
+  }
+  100% {
+    top: 100%;
+  }
+}
+
+/* Mythic Rotator */
+.rotate-clockwise {
+  animation: rotate-cw 25s linear infinite;
+}
+
+.rotate-counter {
+  animation: rotate-ccw 18s linear infinite;
+}
+
+@keyframes rotate-cw {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes rotate-ccw {
+  from { transform: rotate(360deg); }
+  to { transform: rotate(0deg); }
+}
+
+/* Cybernetic Glitch background animation */
+.glitch-overlay {
+  animation: glitch-anim 5s linear infinite;
+}
+
+@keyframes glitch-anim {
+  0% { transform: translate(0) skew(0deg); }
+  1% { transform: translate(-2px, 1px) skew(2deg); }
+  2% { transform: translate(0) skew(0deg); }
+  45% { transform: translate(0) skew(0deg); }
+  46% { transform: translate(1px, -1px) skew(-3deg); }
+  47% { transform: translate(0) skew(0deg); }
+  100% { transform: translate(0) skew(0deg); }
+}
+
+/* Hide scrollbars */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Slow spin custom */
+.animate-spin-slow {
+  animation: spin 6s linear infinite;
+}
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Granular CRT scan-line noise & dynamic jitter layers */
+.crt-analog-noise {
+  position: fixed;
+  inset: -10%;
+  width: 120%;
+  height: 120%;
+  pointer-events: none;
+  z-index: 9998;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0%200%20250%20250'%20xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter%20id='noiseFilter'%3E%3CfeTurbulence%20type='fractalNoise'%20baseFrequency='0.95'%20numOctaves='3'%20stitchTiles='stitch'/%3E%3C/filter%3E%3Crect%20width='100%25'%20height='100%25'%20filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  opacity: 0.048;
+  mix-blend-mode: overlay;
+  animation: crt-grain-jitter 0.1s steps(3) infinite, crt-drift 10s ease-in-out infinite alternate;
+}
+
+.crt-line-sweeper {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  background: linear-gradient(
+    rgba(18, 16, 16, 0) 50%, 
+    rgba(168, 85, 247, 0.04) 50%
+  ), repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.12) 0px,
+    rgba(0, 0, 0, 0.12) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  background-size: 100% 6px;
+  animation: crt-screen-vibrate 0.18s infinite, crt-barrel-distortion 8s ease-in-out infinite alternate;
+  opacity: 0.25;
+}
+
+@keyframes crt-grain-jitter {
+  0% { transform: translate(0, 0); }
+  25% { transform: translate(-0.3%, 0.3%); }
+  50% { transform: translate(0.6%, -0.6%); }
+  75% { transform: translate(-0.6%, -0.3%); }
+  100% { transform: translate(0.3%, 0.6%); }
+}
+
+@keyframes crt-drift {
+  0% {
+    opacity: 0.04;
+    filter: hue-rotate(0deg) contrast(1);
+  }
+  50% {
+    opacity: 0.06;
+    filter: hue-rotate(10deg) contrast(1.02);
+  }
+  100% {
+    opacity: 0.045;
+    filter: hue-rotate(-8deg) contrast(0.98);
+  }
+}
+
+@keyframes crt-screen-vibrate {
+  0% { transform: translateY(0); }
+  50% { transform: translateY(0.2px); }
+  100% { transform: translateY(0); }
+}
+
+@keyframes crt-barrel-distortion {
+  0% {
+    background-size: 100% 5px;
+  }
+  100% {
+    background-size: 100% 7px;
+  }
+}
+
+/* Rhythmic Chromatic Aberration Shift */
+@keyframes chromatic-aberration {
+  0% {
+    filter: drop-shadow(0.8px 0 0 rgba(239, 68, 68, 0.65)) drop-shadow(-0.8px 0 0 rgba(6, 182, 212, 0.65)) contrast(1.05);
+    transform: translate(0, 0);
+  }
+  15% {
+    filter: drop-shadow(-1.5px 0.5px 0.2px rgba(239, 68, 68, 0.8)) drop-shadow(1.2px -0.5px 0.2px rgba(6, 182, 212, 0.8)) contrast(1.15) hue-rotate(1deg);
+    transform: translate(0.4px, -0.3px) scale(0.999);
+  }
+  30% {
+    filter: drop-shadow(1.2px -0.4px 0 rgba(239, 68, 68, 0.6)) drop-shadow(-1.5px 0.4px 0 rgba(6, 182, 212, 0.6)) contrast(0.95);
+    transform: translate(-0.3px, 0.3px);
+  }
+  45% {
+    filter: drop-shadow(-2.2px 0 0.5px rgba(239, 68, 68, 0.95)) drop-shadow(2.2px 0 0.5px rgba(6, 182, 212, 0.95)) contrast(1.2);
+    transform: translate(-0.8px, -0.2px) scale(1.002);
+  }
+  60% {
+    filter: drop-shadow(0.7px 0.3px 0 rgba(239, 68, 68, 0.5)) drop-shadow(-0.7px -0.3px 0 rgba(6, 182, 212, 0.5)) contrast(1.0);
+    transform: translate(0.3px, 0.4px);
+  }
+  75% {
+    filter: drop-shadow(-1.0px -0.5px 0.2px rgba(239, 68, 68, 0.75)) drop-shadow(1.5px 0.5px 0.2px rgba(6, 182, 212, 0.75)) contrast(1.1) hue-rotate(-1deg);
+    transform: translate(-0.4px, -0.5px) scale(1.001);
+  }
+  90% {
+    filter: drop-shadow(1.8px 0.2px 0.4px rgba(239, 68, 68, 0.85)) drop-shadow(-1.5px -0.2px 0.4px rgba(6, 182, 212, 0.85)) contrast(1.08);
+    transform: translate(0.6px, 0.2px) scale(0.998);
+  }
+  100% {
+    filter: drop-shadow(0.8px 0 0 rgba(239, 68, 68, 0.65)) drop-shadow(-0.8px 0 0 rgba(6, 182, 212, 0.65)) contrast(1.05);
+    transform: translate(0, 0);
+  }
+}
+
+.chromatic-aberration-active {
+  animation: chromatic-aberration 0.25s infinite steps(6);
+}
