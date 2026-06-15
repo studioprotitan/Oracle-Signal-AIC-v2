@@ -16,6 +16,7 @@ import { RepairBay3D } from './components/RepairBay3D';
 import { OriginMiniMap } from './components/OriginMiniMap';
 import { AudioVisualizer } from './components/AudioVisualizer';
 import { LoreNetworkGraph } from './components/LoreNetworkGraph';
+import { HeroLandingPage } from './components/HeroLandingPage';
 import { 
   Upload, Sparkles, RefreshCw, Sliders, ChevronRight, Zap, 
   Terminal, ShieldCheck, Eye, EyeOff, Radio, HelpCircle, 
@@ -489,6 +490,7 @@ export function generateOracleIntel(query: string, variant: string): OracleIntel
 }
 
 function App() {
+  const [currentScreen, setCurrentScreen] = useState<'landing' | 'terminal'>('landing');
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<AppStatus>('idle');
   const [data, setData] = useState<{ image: GeneratedImage; analysis: AnalysisResult | null } | null>(null);
@@ -784,16 +786,31 @@ Failed to decode the deep archive. Please verify that your system authentication
     const animate = (timestamp: number) => {
       if (!start) start = timestamp;
       const progress = timestamp - start;
-      const percentage = (progress / duration) * 100;
+      const t = Math.min(progress / duration, 1.0);
       
-      if (percentage < 100) {
-        setScrubPosition(Math.floor((Math.sin((percentage / 100) * Math.PI) * 40) + 50));
+      if (t < 1.0) {
+        // High-fidelity physical response model:
+        // Rapid rise to maximum peak at t = 0.20, followed by an elegant exponential decay tail back to resting state
+        let envelope = 0;
+        if (t < 0.20) {
+          // Normalize rise phase: 0 to 1
+          const risePct = t / 0.20;
+          envelope = Math.sin(risePct * Math.PI / 2); // Quick smooth sine surge
+        } else {
+          // Exponential decay tail: exp(-decayConstant * (t - peakTime))
+          // A decay constant of 4.5 ensures a smooth physical taper to zero amplitude by the time t approaches 1.0
+          envelope = Math.exp(-4.5 * (t - 0.20));
+        }
+
+        // Adjust scrub position dynamically based on physics envelope
+        setScrubPosition(Math.floor((envelope * 40) + 50));
         
         // Sync modulator with the visual water ripple translation
         const period = 150 / Math.max(1, rippleFrequency);
         const phase = (timestamp / 1000) * (2 * Math.PI / period);
-        // Softly oscillate between 0.6 and 1.4 for high-fidelity pulse feedback
-        const multiplier = 1.0 + Math.sin(phase) * 0.4;
+        
+        // Oscillation is damped exponentially by the decay tail envelope
+        const multiplier = 1.0 + (Math.sin(phase) * 0.4 * envelope);
         setPulseModulator(multiplier);
         
         frameId = requestAnimationFrame(animate);
@@ -1693,7 +1710,24 @@ METADATA SIGNATURE ASSIGNED // ARCHIVIST HUB CONSOLE`;
         )}
       </AnimatePresence>
 
-      <div className="relative z-10 w-full h-full flex flex-col p-4 md:p-6 overflow-hidden">
+      <AnimatePresence mode="wait">
+        {currentScreen === 'landing' ? (
+          <HeroLandingPage 
+            key="landing-page" 
+            onEnter={() => {
+              setCurrentScreen('terminal');
+              addLog("SYSTEM // NEURAL COMM LINK INITIALIZED. ACCESS DIRECTLY GRANTED.");
+            }} 
+          />
+        ) : (
+          <motion.div 
+            key="console-viewport"
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.6, ease: "easeOut" }}
+            className="relative z-10 w-full h-full flex flex-col p-4 md:p-6 overflow-hidden"
+          >
         
         {/* Main Terminal Bar Header */}
         <header className="flex-none flex flex-col md:flex-row justify-between items-start md:items-center border-b border-white/10 pb-4 mb-4 gap-3">
@@ -4134,7 +4168,9 @@ METADATA SIGNATURE ASSIGNED // ARCHIVIST HUB CONSOLE`;
           </div>
         )}
 
-      </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
