@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@babylonjs/core": "^9.10.1",
+    "@babylonjs/loaders": "^9.13.0",
     "@google/genai": "^1.33.0",
     "@types/d3": "^7.4.3",
     "d3": "^7.9.0",

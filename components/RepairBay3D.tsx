@@ -13,8 +13,10 @@ import {
   PointLight, 
   SpotLight, 
   ArcRotateCamera,
-  TransformNode
+  TransformNode,
+  SceneLoader
 } from "@babylonjs/core";
+import "@babylonjs/loaders";
 import { 
   Play, Pause, RefreshCw, Layers, Shield, Wrench, AlertTriangle, 
   Heart, Activity, Gauge, Navigation, Compass, User, Zap, Database, 
@@ -27,17 +29,48 @@ interface Props {
   originalQuery?: string;
   snapToGrid?: 'off' | '15' | '45';
   rippleFrequency?: number;
+  isCoaxialBurstActive?: boolean;
 }
 
 export const RepairBay3D: React.FC<Props> = ({ 
   addLog, 
   originalQuery = "Genesis Relic", 
   snapToGrid = 'off',
-  rippleFrequency = 50
+  rippleFrequency = 50,
+  isCoaxialBurstActive = false
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const isCoaxialBurstActiveRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    isCoaxialBurstActiveRef.current = !!isCoaxialBurstActive;
+  }, [isCoaxialBurstActive]);
   
+  // Customizable Lance Forge state variables
+  const [isLanceModalOpen, setIsLanceModalOpen] = useState<boolean>(false);
+  const [lanceTipLength, setLanceTipLength] = useState<number>(1.4);
+  const [lanceGlowColor, setLanceGlowColor] = useState<string>("#a855f7"); // Purple/magenta default
+  const [lanceRingCount, setLanceRingCount] = useState<number>(2);
+  const [lanceExpansion, setLanceExpansion] = useState<number>(1.0);
+  const [lancePositionMode, setLancePositionMode] = useState<'train' | 'ring'>('train');
+  const [lancePowerLevel, setLancePowerLevel] = useState<number>(85);
+  const [isLanceBuilt, setIsLanceBuilt] = useState<boolean>(false);
+
+  // New Upgrade Refs for complex geometry and animation
+  const steamRef = useRef<{ mesh: any; vy: number; vx: number; vz: number; life: number; size: number }[]>([]);
+  const fanBladesRef = useRef<any[]>([]);
+  const repairArmsRef = useRef<{ base: any; lowerArm: any; upperArm: any; toolHead: any; angleOffset: number }[]>([]);
+  const couplingGearsRef = useRef<any[]>([]);
+  const observerNodeRef = useRef<any>(null);
+  const abexConduitsRef = useRef<any[]>([]);
+  const gantryTrolleyRef = useRef<any>(null);
+  const hydraulicLockersRef = useRef<{ sleeve: any; piston: any; clamp: any; angle: number; currentExtension: number }[]>([]);
+
+  // Custom Lance References
+  const lanceRootRef = useRef<any>(null);
+  const lanceRingsRef = useRef<any[]>([]);
+
   // Scrubber value for spatial position along rails (-5 to 5, where 0 is center)
   const [transitScrub, setTransitScrub] = useState<number>(1.5);
   const [autoPatrol, setAutoPatrol] = useState<boolean>(true);
@@ -116,6 +149,306 @@ export const RepairBay3D: React.FC<Props> = ({
       pwr: 90
     }
   ]);
+
+  // New visual Tab & 3D Stage states for Field Unit Inspection
+  const [activeDeskTab, setActiveDeskTab] = useState<'hologram' | 'inspection'>('hologram');
+  const [loadedModelName, setLoadedModelName] = useState<string | null>(null);
+  const [activePreset, setActivePreset] = useState<'cst-mvp' | 'forge' | null>(null);
+  const [currentLightPreset, setCurrentLightPreset] = useState<'flood' | 'excitation' | 'lowglow'>('flood');
+  const [currentCameraPreset, setCurrentCameraPreset] = useState<'orbit' | 'head' | 'chassis' | 'bottom'>('orbit');
+  const [isDroneInspectOn, setIsDroneInspectOn] = useState<boolean>(false);
+
+  // Refs and support states for terminal
+  const inspectionCanvasRef = useRef<HTMLCanvasElement>(null);
+  const inspectionEngineRef = useRef<any>(null);
+  const inspectionSceneRef = useRef<any>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [pressedKeys, setPressedKeys] = useState<{ [key: string]: boolean }>({});
+
+  // Keyboard monitoring effect
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (activeDeskTab !== 'inspection') return;
+      const key = e.key.toLowerCase();
+      setPressedKeys(prev => ({ ...prev, [key]: true }));
+
+      let action = '';
+      if (key === 'w' || key === 's') action = 'WALK DIRECTION VECTORS INJECTED';
+      else if (key === 'a' || key === 'd') action = 'STRAFE COMPENSATOR ENGAGED';
+      else if (key === ' ') action = 'EMERGENCY JUMP BOOST FIRED';
+      else if (key === 'f') action = 'ARMED FIST OVERDRIVE ENERGIZED';
+      else if (key === 'g') action = 'WEAPON FIRE CYCLED (S -> M -> F)';
+      else if (key === 'e') action = 'CONTEXT INTERACTION DEPLOYED';
+      else if (key === 'q') action = 'OSU AGILITY BOOST ENGAGED';
+      else if (key === 'x') action = 'OPERATIVE LOADOUT DEPLOYED';
+      else if (key === 'tab') {
+        e.preventDefault();
+        action = 'CONTROLLER MATRIX TOGGLED';
+      }
+
+      if (action) {
+        addLog(`INSPECTOR KEYS // COMMAND [${key.toUpperCase()}]: ${action}`);
+      }
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      const key = e.key.toLowerCase();
+      setPressedKeys(prev => ({ ...prev, [key]: false }));
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [activeDeskTab]);
+
+  // File drop event brokers
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      const file = e.dataTransfer.files[0];
+      if (file.name.endsWith('.glb')) {
+        (window as any).__lastUploadedGlbFile = file;
+        setLoadedModelName(file.name);
+        setActivePreset(null);
+        addLog(`INSPECTOR TERMINAL // REGISTERED USER UPLOAD: [${file.name}]`);
+      } else {
+        addLog(`INSPECTOR TERMINAL // ERROR: SUPPORTED FILE TYPE MUST BE .glb`);
+      }
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      if (file.name.endsWith('.glb')) {
+        (window as any).__lastUploadedGlbFile = file;
+        setLoadedModelName(file.name);
+        setActivePreset(null);
+        addLog(`INSPECTOR TERMINAL // REGISTERED USER BROWSE: [${file.name}]`);
+      } else {
+        addLog(`INSPECTOR TERMINAL // ERROR: SUPPORTED FILE TYPE MUST BE .glb`);
+      }
+    }
+  };
+
+  // Render loop and scene setup for the Field Unit Inspection Terminal
+  useEffect(() => {
+    if (activeDeskTab !== 'inspection') return;
+    if (!activePreset && !loadedModelName) return;
+    if (!inspectionCanvasRef.current) return;
+
+    const engine = new Engine(inspectionCanvasRef.current, true);
+    inspectionEngineRef.current = engine;
+
+    const scene = new Scene(engine);
+    scene.clearColor = new Color4(0.01, 0.02, 0.04, 1.0);
+    inspectionSceneRef.current = scene;
+
+    // Camera setup
+    const camera = new ArcRotateCamera(
+      "inspectorCamera",
+      Math.PI / 4,
+      Math.PI / 2.3,
+      6.0,
+      new Vector3(0, 0.5, 0),
+      scene
+    );
+    camera.attachControl(inspectionCanvasRef.current, true);
+    camera.lowerRadiusLimit = 1.5;
+    camera.upperRadiusLimit = 15.0;
+
+    // Lights
+    const mainLight = new HemisphericLight("inspectorHLight", new Vector3(0, 1, 0), scene);
+    mainLight.intensity = currentLightPreset === 'flood' ? 1.0 : currentLightPreset === 'excitation' ? 0.45 : 0.2;
+    mainLight.groundColor = new Color3(0.02, 0.04, 0.08);
+
+    const directLight = new PointLight("inspectorPLight", new Vector3(3, 4, 3), scene);
+    directLight.intensity = currentLightPreset === 'flood' ? 1.5 : currentLightPreset === 'excitation' ? 2.5 : 0.5;
+    directLight.diffuse = currentLightPreset === 'excitation' ? new Color3(1.0, 0.0, 0.5) : new Color3(1.0, 1.0, 1.0);
+
+    const rimLight = new PointLight("inspectorRim", new Vector3(-3, 2, -3), scene);
+    rimLight.intensity = currentLightPreset === 'excitation' ? 3.0 : 0.8;
+    rimLight.diffuse = currentLightPreset === 'excitation' ? new Color3(0.0, 1.0, 1.0) : new Color3(0.09, 0.45, 0.9);
+
+    // Apply camera presets
+    if (currentCameraPreset === 'orbit') {
+      camera.setPosition(new Vector3(4, 3, 4));
+      camera.setTarget(new Vector3(0, 0.5, 0));
+    } else if (currentCameraPreset === 'head') {
+      camera.setPosition(new Vector3(0, 1.2, 2.2));
+      camera.setTarget(new Vector3(0, 1.0, 0));
+    } else if (currentCameraPreset === 'chassis') {
+      camera.setPosition(new Vector3(2.5, 0.6, 2.5));
+      camera.setTarget(new Vector3(0, 0.5, 0));
+    } else if (currentCameraPreset === 'bottom') {
+      camera.setPosition(new Vector3(3, -0.4, 3));
+      camera.setTarget(new Vector3(0, -0.1, 0));
+    }
+
+    // Build grid on ground
+    const gridGround = MeshBuilder.CreateGround("inspectorGround", { width: 12, height: 12 }, scene);
+    const groundMat = new StandardMaterial("inspectorGroundMat", scene);
+    groundMat.diffuseColor = new Color3(0.03, 0.05, 0.08);
+    groundMat.specularColor = new Color3(0.1, 0.1, 0.1);
+    gridGround.material = groundMat;
+
+    // Create glowing neon floor lines
+    const ringTorus = MeshBuilder.CreateTorus("glowTorus", { diameter: 4.0, thickness: 0.04, tessellation: 32 }, scene);
+    ringTorus.position.y = 0.01;
+    const ringMat = new StandardMaterial("ringMat", scene);
+    ringMat.emissiveColor = new Color3(0.0, 0.9, 1.0);
+    ringTorus.material = ringMat;
+
+    // Create procedural meshes based on preset
+    let modelRoot: any = null;
+    let customAnimation: () => void = () => {};
+
+    if (activePreset === 'cst-mvp') {
+      modelRoot = new TransformNode("cstRoot", scene);
+      
+      const body = MeshBuilder.CreateCylinder("cstBody", { height: 1.0, diameter: 0.7, tessellation: 12 }, scene);
+      body.parent = modelRoot;
+      body.position.y = 0.6;
+      const metalMat = new StandardMaterial("metalMat", scene);
+      metalMat.diffuseColor = new Color3(0.15, 0.18, 0.22);
+      metalMat.specularColor = new Color3(0.8, 0.85, 0.9);
+      body.material = metalMat;
+
+      const head = MeshBuilder.CreateSphere("cstHead", { diameter: 0.5 }, scene);
+      head.parent = modelRoot;
+      head.position.y = 1.35;
+      const headMat = new StandardMaterial("headMat", scene);
+      headMat.diffuseColor = new Color3(0.08, 0.10, 0.14);
+      headMat.emissiveColor = new Color3(0.0, 0.8, 1.0);
+      head.material = headMat;
+
+      const orbitRing1 = MeshBuilder.CreateTorus("orbitTorus1", { diameter: 1.2, thickness: 0.03, tessellation: 24 }, scene);
+      orbitRing1.parent = modelRoot;
+      orbitRing1.position.y = 0.6;
+      const ring1Mat = new StandardMaterial("ring1Mat", scene);
+      ring1Mat.emissiveColor = new Color3(1.0, 0.0, 0.5);
+      orbitRing1.material = ring1Mat;
+
+      customAnimation = () => {
+        const t = performance.now() * 0.0025;
+        modelRoot.position.y = 0.2 + Math.sin(t * 1.5) * 0.12; 
+        orbitRing1.rotation.x = t;
+        orbitRing1.rotation.y = t * 0.7;
+        body.rotation.y = t * 0.4;
+      };
+
+    } else if (activePreset === 'forge') {
+      modelRoot = new TransformNode("forgeRoot", scene);
+
+      const generator = MeshBuilder.CreateBox("generatorBox", { size: 0.8 }, scene);
+      generator.parent = modelRoot;
+      generator.position.y = 0.5;
+      const boxMat = new StandardMaterial("boxMat", scene);
+      boxMat.diffuseColor = new Color3(0.25, 0.15, 0.08);
+      boxMat.specularColor = new Color3(0.6, 0.4, 0.2);
+      generator.material = boxMat;
+
+      const innerCore = MeshBuilder.CreateSphere("innerCore", { diameter: 0.4 }, scene);
+      innerCore.parent = modelRoot;
+      innerCore.position.y = 0.5;
+      const coreMat = new StandardMaterial("coreMat", scene);
+      coreMat.emissiveColor = new Color3(1.0, 0.5, 0.0);
+      innerCore.material = coreMat;
+
+      const pylonL = MeshBuilder.CreateBox("pylonL", { width: 0.15, height: 1.2, depth: 0.3 }, scene);
+      pylonL.parent = modelRoot;
+      pylonL.position.set(-0.6, 0.6, 0);
+      const pylonMat = new StandardMaterial("pylonMat", scene);
+      pylonMat.diffuseColor = new Color3(0.12, 0.12, 0.13);
+      pylonL.material = pylonMat;
+
+      const pylonR = MeshBuilder.CreateBox("pylonR", { width: 0.15, height: 1.2, depth: 0.3 }, scene);
+      pylonR.parent = modelRoot;
+      pylonR.position.set(0.6, 0.6, 0);
+      pylonR.material = pylonMat;
+
+      customAnimation = () => {
+        const t = performance.now() * 0.0025;
+        modelRoot.rotation.y = t * 0.6;
+        generator.rotation.x = Math.sin(t) * 0.15;
+        innerCore.scaling.setAll(1.0 + Math.sin(t * 4) * 0.12);
+      };
+
+    } else if (loadedModelName) {
+      const cachedFile = (window as any).__lastUploadedGlbFile;
+      if (cachedFile) {
+        try {
+          const fileUrl = URL.createObjectURL(cachedFile);
+          SceneLoader.Append("", fileUrl, scene, (loadedScene) => {
+            loadedScene.meshes.forEach(mesh => {
+              if (!mesh.parent) {
+                mesh.position.set(0, 0, 0);
+              }
+            });
+            addLog(`INSPECTOR GLTF // LOADED USER MODEL [${cachedFile.name}] SUCCESSFULLY`);
+          }, null, (_scene, message) => {
+            addLog(`INSPECTOR GLTF // LOAD ERROR: ${message || 'Unsupported format'}`);
+          }, ".glb");
+        } catch (e: any) {
+          addLog(`INSPECTOR GLTF // ERROR: ${e.message}`);
+        }
+      } else {
+        modelRoot = MeshBuilder.CreateTorusKnot("demoKnot", { radius: 0.4, tube: 0.12 }, scene);
+        modelRoot.position.y = 0.6;
+        const fallbackMat = new StandardMaterial("fallbackMat", scene);
+        fallbackMat.emissiveColor = new Color3(0.0, 1.0, 0.5);
+        modelRoot.material = fallbackMat;
+        customAnimation = () => {
+          modelRoot.rotation.y += 0.01;
+        };
+      }
+    }
+
+    // Hover sweeping scanning rings if toggle is ON
+    let droneRing: any = null;
+    if (isDroneInspectOn) {
+      droneRing = MeshBuilder.CreateTorus("droneRing", { diameter: 2.2, thickness: 0.02, tessellation: 24 }, scene);
+      droneRing.position.y = 0.5;
+      const droneMat = new StandardMaterial("droneMat", scene);
+      droneMat.emissiveColor = new Color3(0.0, 1.0, 0.0);
+      droneRing.material = droneMat;
+    }
+
+    engine.runRenderLoop(() => {
+      if (customAnimation) customAnimation();
+      if (droneRing) {
+        const scanT = performance.now() * 0.003;
+        droneRing.position.y = 0.5 + Math.sin(scanT * 2.0) * 0.6;
+        droneRing.rotation.y = scanT * 0.5;
+      }
+      scene.render();
+    });
+
+    const handleResize = () => {
+      engine.resize();
+    };
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      scene.dispose();
+      engine.dispose();
+    };
+  }, [activeDeskTab, activePreset, loadedModelName, currentLightPreset, currentCameraPreset, isDroneInspectOn]);
 
   // Simulate real-time neural sync fluctuation & telemetry twitching
   useEffect(() => {
@@ -286,10 +619,212 @@ export const RepairBay3D: React.FC<Props> = ({
     stepRef.current = repairStep;
   }, [repairStep]);
 
+  // Dynamic 3D Lance Construction & Calibration logic
+  const applyLanceConstruction = () => {
+    const scene = sceneRef.current;
+    if (!scene) return;
+
+    // 1. Dispose old lance assemblies and orbit rings if any exist
+    if (lanceRootRef.current) {
+      lanceRootRef.current.dispose();
+      lanceRootRef.current = null;
+      lanceRingsRef.current = [];
+    }
+
+    if (!isLanceBuilt) return;
+
+    // 2. Create high-fidelity custom Lance root node
+    const lanceRoot = new TransformNode("lanceModuleRoot", scene);
+    lanceRootRef.current = lanceRoot;
+
+    // Parent to carriage (train) or couple in central ring
+    if (lancePositionMode === 'train' && rootNodeRef.current) {
+      lanceRoot.parent = rootNodeRef.current;
+      // Affix directly onto the roof panel of the freight train
+      lanceRoot.position.set(0, 1.6, 0);
+      lanceRoot.rotation.set(0, 0, Math.PI / 2); // horizontal forward vector
+    } else {
+      // Float symmetrically within the mystical coupling ring matrix
+      lanceRoot.position.set(0, 1.25, 0);
+      lanceRoot.rotation.set(0, 0, 0); // vertical alignment
+    }
+
+    // Material setups: procedural gold, metallic silver, emissive energy core
+    const silverMetalMat = new StandardMaterial("lanceSilverMat", scene);
+    silverMetalMat.diffuseColor = new Color3(0.24, 0.26, 0.32);
+    silverMetalMat.specularColor = new Color3(0.72, 0.75, 0.85);
+    silverMetalMat.roughness = 0.22;
+
+    const goldTrimMat = new StandardMaterial("lanceGoldMat", scene);
+    goldTrimMat.diffuseColor = new Color3(0.68, 0.48, 0.12);
+    goldTrimMat.specularColor = new Color3(0.85, 0.75, 0.3);
+    goldTrimMat.emissiveColor = new Color3(0.12, 0.08, 0.02);
+
+    const glowColorObj = Color3.FromHexString(lanceGlowColor);
+    const emitterEnergyMat = new StandardMaterial("lanceGlowEnergyMat", scene);
+    emitterEnergyMat.emissiveColor = glowColorObj;
+    emitterEnergyMat.diffuseColor = new Color3(0.01, 0.01, 0.01);
+    emitterEnergyMat.disableLighting = true;
+
+    // A. Base Coupling collar joint
+    const baseCollar = MeshBuilder.CreateCylinder("lanceBaseCollar", {
+      diameter: 0.35,
+      height: 0.42,
+      tessellation: 16
+    }, scene);
+    baseCollar.parent = lanceRoot;
+    baseCollar.position.y = -0.65;
+    baseCollar.material = goldTrimMat;
+
+    // B. Textured main staff cylinder shaft
+    const hiltShaft = MeshBuilder.CreateCylinder("lanceHiltShaft", {
+      diameter: 0.15,
+      height: 1.1,
+      tessellation: 16
+    }, scene);
+    hiltShaft.parent = lanceRoot;
+    hiltShaft.position.y = 0.05;
+    hiltShaft.material = silverMetalMat;
+
+    // Small gold rings along the hilt shaft to create detailed profile silhouette
+    for (let h = -0.4; h <= 0.4; h += 0.2) {
+      const ringDet = MeshBuilder.CreateCylinder(`hiltRing_${h}`, {
+        diameter: 0.2,
+        height: 0.04,
+        tessellation: 12
+      }, scene);
+      ringDet.parent = lanceRoot;
+      ringDet.position.y = h + 0.05;
+      ringDet.material = goldTrimMat;
+    }
+
+    // C. Core Central Chamber (Housing the floating crystalline orb)
+    const powerChamber = MeshBuilder.CreateCylinder("lancePowerChamber", {
+      diameterTop: 0.38,
+      diameterBottom: 0.38,
+      height: 0.52,
+      tessellation: 16
+    }, scene);
+    powerChamber.parent = lanceRoot;
+    powerChamber.position.y = 0.85;
+    powerChamber.material = silverMetalMat;
+
+    // The inner floating catalyst core crystal
+    const crystalCore = MeshBuilder.CreateSphere("lanceCrystalCore", {
+      diameter: 0.24,
+      segments: 8
+    }, scene);
+    crystalCore.parent = lanceRoot;
+    crystalCore.position.y = 0.85;
+    crystalCore.scaling.set(1.0, 1.4, 1.0); // prismatic crystal
+    crystalCore.material = emitterEnergyMat;
+
+    // Chamber protective support guards (four black struts)
+    const darkShieldMat = new StandardMaterial("darkShieldMat", scene);
+    darkShieldMat.diffuseColor = new Color3(0.04, 0.04, 0.06);
+    
+    for (let r = 0; r < 4; r++) {
+      const guardStrut = MeshBuilder.CreateBox(`guardStrut_${r}`, {
+        width: 0.04,
+        height: 0.54,
+        depth: 0.4
+      }, scene);
+      guardStrut.parent = lanceRoot;
+      guardStrut.position.y = 0.85;
+      guardStrut.rotation.y = (r * Math.PI) / 4;
+      guardStrut.material = darkShieldMat;
+    }
+
+    // D. Outer Magnetic Rails & Stabilizer brackets
+    for (let s = 0; s < 3; s++) {
+      const angle = (s * Math.PI * 2) / 3;
+      const radius = 0.32 * lanceExpansion;
+
+      const stabPylon = MeshBuilder.CreateBox(`stabPylon_${s}`, {
+        width: 0.05,
+        height: 0.82,
+        depth: 0.04
+      }, scene);
+      stabPylon.parent = lanceRoot;
+      stabPylon.position.set(Math.cos(angle) * radius * 0.75, 0.85, Math.sin(angle) * radius * 0.75);
+      stabPylon.rotation.y = -angle;
+      stabPylon.material = goldTrimMat;
+
+      // Miniature flux capacitors
+      const magnetNode = MeshBuilder.CreateTorus(`magnetNode_${s}`, {
+        diameter: 0.22,
+        thickness: 0.05,
+        tessellation: 12
+      }, scene);
+      magnetNode.parent = lanceRoot;
+      magnetNode.position.set(Math.cos(angle) * radius * 1.25, 0.85, Math.sin(angle) * radius * 1.25);
+      magnetNode.rotation.y = -angle;
+      magnetNode.material = emitterEnergyMat;
+    }
+
+    // E. Symmetrically orbiting concentration halos
+    const spawnedRings: any[] = [];
+    for (let r = 0; r < lanceRingCount; r++) {
+      const ringScale = (0.55 + r * 0.35) * lanceExpansion;
+      const ringTorus = MeshBuilder.CreateTorus(`lanceOrbitRing_${r}`, {
+        diameter: ringScale * 1.4,
+        thickness: 0.04,
+        tessellation: 20
+      }, scene);
+      ringTorus.parent = lanceRoot;
+      ringTorus.position.y = 0.85;
+      ringTorus.rotation.x = (Math.PI / 6) * (r + 1);
+      ringTorus.material = emitterEnergyMat;
+      spawnedRings.push(ringTorus);
+    }
+    lanceRingsRef.current = spawnedRings;
+
+    // F. Tip Cap & Needle sharp conic Lance head
+    const tipBaseCollar = MeshBuilder.CreateCylinder("lanceTipBaseCollar", {
+      diameterTop: 0.16,
+      diameterBottom: 0.35,
+      height: 0.25,
+      tessellation: 16
+    }, scene);
+    tipBaseCollar.parent = lanceRoot;
+    tipBaseCollar.position.y = 1.2;
+    tipBaseCollar.material = goldTrimMat;
+
+    // Extended Needle metal tip
+    const steelTipCone = MeshBuilder.CreateCylinder("lanceSteelTip", {
+      diameterTop: 0.0,
+      diameterBottom: 0.18,
+      height: lanceTipLength,
+      tessellation: 16
+    }, scene);
+    steelTipCone.parent = lanceRoot;
+    steelTipCone.position.y = 1.2 + (lanceTipLength / 2);
+    steelTipCone.material = silverMetalMat;
+
+    // Concentrated discharge helix loop around base
+    const dischargeHelix = MeshBuilder.CreateCylinder("dischargeHelix", {
+      diameterTop: 0.08,
+      diameterBottom: 0.22,
+      height: 0.42,
+      tessellation: 12
+    }, scene);
+    dischargeHelix.parent = lanceRoot;
+    dischargeHelix.position.y = 1.34;
+    dischargeHelix.material = emitterEnergyMat;
+
+    addLog(`MODULE_FORGE // COMPLETED RE-CALIBRATED CONSTRUCTION OF Modular Light-Lance [LEVEL ${lancePowerLevel}%]`);
+  };
+
+  useEffect(() => {
+    applyLanceConstruction();
+  }, [lanceTipLength, lanceGlowColor, lanceRingCount, lanceExpansion, lancePositionMode, isLanceBuilt, activeRoute]);
+
   // Adjust Babylon light diffuse/ambient color on active route change in real-time
   useEffect(() => {
     if (rimLightRef.current && sceneRef.current) {
       const nowScene = sceneRef.current;
+      let totemColor = new Color3(0.0, 0.9, 1.0); // Central (Cyan)
+      
       if (activeRoute === 'central') {
         rimLightRef.current.diffuse = new Color3(0.0, 0.9, 1.0); // Cyan glow
         rimLightRef.current.intensity = 1.8;
@@ -300,12 +835,21 @@ export const RepairBay3D: React.FC<Props> = ({
         rimLightRef.current.intensity = 2.4;
         nowScene.clearColor = new Color4(0.0, 0.04, 0.03, 1.0);
         addLog("SIGNAL COCKPIT // ROUTED INTO SUB-OCEANIC COUPLING CHANNELS. STRESS DRIFT ACTIVE.");
+        totemColor = new Color3(0.0, 1.0, 0.55);
       } else if (activeRoute === 'siren') {
         rimLightRef.current.diffuse = new Color3(0.85, 0.15, 1.0); // Deep violet glow
         rimLightRef.current.intensity = 3.0;
         nowScene.clearColor = new Color4(0.03, 0.0, 0.05, 1.0);
         addLog("SIGNAL COCKPIT // CRITICAL ORACLE RESONANCE EXCEEDING SPEC IN VERTEX HORIZON!");
+        totemColor = new Color3(0.85, 0.15, 1.0);
       }
+
+      // Dynamically re-color the Oracle Monolith rings if they exist
+      abexConduitsRef.current.forEach(totemTorus => {
+        if (totemTorus && totemTorus.material) {
+          (totemTorus.material as StandardMaterial).emissiveColor = totemColor;
+        }
+      });
     }
   }, [activeRoute]);
 
@@ -424,84 +968,542 @@ export const RepairBay3D: React.FC<Props> = ({
     welderLight.diffuse = new Color3(1.0, 0.6, 0.1); 
     welderLightRef.current = welderLight;
 
-    // Metal Ground Grid
-    const ground = MeshBuilder.CreateGround("dockGround", { width: 24, height: 16, subdivisions: 4 }, scene);
+    // 1. FLOOR PLATING (The ground is broken up into layered structural plates)
+    const ground = MeshBuilder.CreateGround("dockGroundBase", { width: 24, height: 16, subdivisions: 2 }, scene);
     const groundMat = new StandardMaterial("groundMat", scene);
-    groundMat.diffuseColor = new Color3(0.07, 0.08, 0.11);
-    groundMat.specularColor = new Color3(0.15, 0.2, 0.25);
-    groundMat.roughness = 0.85;
+    groundMat.diffuseColor = new Color3(0.04, 0.05, 0.07);
+    groundMat.specularColor = new Color3(0.1, 0.1, 0.1);
     ground.material = groundMat;
+
+    // Create 12 raised industrial metal deck plates
+    const plateMetalMat = new StandardMaterial("plateMetalMat", scene);
+    plateMetalMat.diffuseColor = new Color3(0.09, 0.11, 0.14);
+    plateMetalMat.specularColor = new Color3(0.35, 0.38, 0.42);
+    plateMetalMat.roughness = 0.6;
+
+    for (let x = -10; x <= 10; x += 4) {
+      for (let z = -6; z <= 6; z += 4) {
+        if (Math.abs(x) < 2 && Math.abs(z) < 2) continue; // Leave center for the coupling pit
+        const deckPlate = MeshBuilder.CreateBox(`deckPlate_${x}_${z}`, {
+          width: 3.8,
+          height: 0.02,
+          depth: 3.8
+        }, scene);
+        deckPlate.position.set(x, 0.01, z);
+        deckPlate.material = plateMetalMat;
+      }
+    }
+
+    // 2. COUPLING MECHANICAL PIT (Beneath the glowing ring - Extends deep under)
+    const pitVoid = MeshBuilder.CreateCylinder("pitVoid", {
+      diameter: 3.3,
+      height: 1.8,
+      tessellation: 24
+    }, scene);
+    pitVoid.position.set(0, -0.9, 0);
+    const pitMat = new StandardMaterial("pitMat", scene);
+    pitMat.diffuseColor = new Color3(0.015, 0.015, 0.02);
+    pitMat.specularColor = new Color3(0.05, 0.05, 0.05);
+    pitVoid.material = pitMat;
+
+    // Sub-floor mechanical structural support rib-rings descending downwards
+    const ribMat = new StandardMaterial("pitRibMat", scene);
+    ribMat.diffuseColor = new Color3(0.06, 0.07, 0.09);
+    ribMat.specularColor = new Color3(0.2, 0.22, 0.25);
+    ribMat.roughness = 0.5;
+
+    for (let rIdx = 1; rIdx <= 4; rIdx++) {
+      const ribRing = MeshBuilder.CreateTorus(`pitSupportRib_${rIdx}`, {
+        diameter: 3.25,
+        thickness: 0.08,
+        tessellation: 20
+      }, scene);
+      ribRing.position.set(0, -0.35 * rIdx, 0);
+      ribRing.material = ribMat;
+    }
+
+    // Create giant interface gears inside pit with detailed physical gear teeth meshes
+    const gearMainMat = new StandardMaterial("gearMainMat", scene);
+    gearMainMat.diffuseColor = new Color3(0.22, 0.24, 0.28);
+    gearMainMat.specularColor = new Color3(0.65, 0.68, 0.72);
+    gearMainMat.roughness = 0.25;
+
+    const gearL = MeshBuilder.CreateCylinder("mechanicalGearL", {
+      diameter: 1.6,
+      height: 0.16,
+      tessellation: 16
+    }, scene);
+    gearL.position.set(-0.62, -0.32, 0);
+    gearL.material = gearMainMat;
+
+    const gearR = MeshBuilder.CreateCylinder("mechanicalGearR", {
+      diameter: 1.6,
+      height: 0.16,
+      tessellation: 16
+    }, scene);
+    gearR.position.set(0.62, -0.28, 0);
+    gearR.material = gearMainMat;
+
+    // Helper functions inside the block to construct radial gear teeth to mesh correctly
+    const teethCount = 14;
+    const teethMat = new StandardMaterial("teethMat", scene);
+    teethMat.diffuseColor = new Color3(0.14, 0.15, 0.18);
+    teethMat.specularColor = new Color3(0.5, 0.52, 0.55);
+    teethMat.roughness = 0.35;
+
+    for (let i = 0; i < teethCount; i++) {
+      const angleL = (i * 2 * Math.PI) / teethCount;
+      const toothL = MeshBuilder.CreateBox(`toothL_${i}`, {
+        width: 0.15,
+        height: 0.16,
+        depth: 0.25
+      }, scene);
+      toothL.parent = gearL;
+      toothL.position.set(Math.cos(angleL) * 0.8, 0, Math.sin(angleL) * 0.8);
+      toothL.rotation.y = -angleL;
+      toothL.material = teethMat;
+
+      // Rotate right gear teeth offset to model interlocking
+      const angleR = (i * 2 * Math.PI) / teethCount + (Math.PI / teethCount);
+      const toothR = MeshBuilder.CreateBox(`toothR_${i}`, {
+        width: 0.15,
+        height: 0.16,
+        depth: 0.25
+      }, scene);
+      toothR.parent = gearR;
+      toothR.position.set(Math.cos(angleR) * 0.8, 0, Math.sin(angleR) * 0.8);
+      toothR.rotation.y = -angleR;
+      toothR.material = teethMat;
+    }
+
+    couplingGearsRef.current = [gearL, gearR];
 
     // Glowing Floor Ring (Center coupling capture node)
     const floorRing = MeshBuilder.CreateCylinder("repairZoneRing", {
       diameter: 3.2,
-      height: 0.03,
-      tessellation: 32
+      height: 0.04,
+      tessellation: 40
     }, scene);
-    floorRing.position.y = 0.01;
+    floorRing.position.y = 0.02;
     const ringMat = new StandardMaterial("ringMat", scene);
     ringMat.emissiveColor = new Color3(0.0, 0.95, 1.0); 
     ringMat.diffuseColor = new Color3(0, 0.08, 0.12);
     floorRing.material = ringMat;
     glowingRingRef.current = floorRing;
 
-    // Parallel rails
-    const rail1 = MeshBuilder.CreateBox("railLeft", { width: 20, height: 0.1, depth: 0.12 }, scene);
-    rail1.position.set(0, 0.05, 0.7);
-    const rail2 = MeshBuilder.CreateBox("railRight", { width: 20, height: 0.1, depth: 0.12 }, scene);
-    rail2.position.set(0, 0.05, -0.7);
+    // 4 Symmetrical Hydraulic Locking Clamps surrounding the repair zone ring
+    const hydraulicSleeveMat = new StandardMaterial("hydroSleeveMat", scene);
+    hydraulicSleeveMat.diffuseColor = new Color3(0.2, 0.22, 0.26);
+    hydraulicSleeveMat.specularColor = new Color3(0.5, 0.55, 0.6);
+
+    const hydraulicPistonMat = new StandardMaterial("hydroPistonMat", scene);
+    hydraulicPistonMat.diffuseColor = new Color3(0.6, 0.62, 0.65);
+    hydraulicPistonMat.specularColor = new Color3(0.9, 0.92, 0.96);
+    hydraulicPistonMat.roughness = 0.1;
+
+    const hydraulicClawMat = new StandardMaterial("hydroClawMat", scene);
+    hydraulicClawMat.diffuseColor = new Color3(0.08, 0.09, 0.12);
+    hydraulicClawMat.specularColor = new Color3(0.3, 0.32, 0.35);
+
+    hydraulicLockersRef.current = [];
+
+    const angles = [Math.PI / 4, 3 * Math.PI / 4, 5 * Math.PI / 4, 7 * Math.PI / 4];
+    angles.forEach((lockAngle, aIdx) => {
+      // Create structural sleeve anchor housing
+      const sleeveBox = MeshBuilder.CreateBox(`hydroSleeve_${aIdx}`, {
+        width: 0.35,
+        height: 0.22,
+        depth: 0.7
+      }, scene);
+      sleeveBox.material = hydraulicSleeveMat;
+      
+      // Position sleeve far outside center ring
+      const sleeveRadius = 2.3;
+      sleeveBox.position.set(Math.cos(lockAngle) * sleeveRadius, 0.11, Math.sin(lockAngle) * sleeveRadius);
+      // Face towards center origin (0, 0, 0)
+      sleeveBox.rotation.y = -lockAngle;
+
+      // Sliding inner metal cylinder piston
+      const pistonCyl = MeshBuilder.CreateCylinder(`hydroPiston_${aIdx}`, {
+        diameter: 0.16,
+        height: 0.65,
+        tessellation: 12
+      }, scene);
+      pistonCyl.material = hydraulicPistonMat;
+      // Cylinder default is vertical: rotate 90 deg so it can lie flat
+      pistonCyl.rotation.x = Math.PI / 2;
+      
+      const pistonCompRoot = new TransformNode(`hydroPistonRoot_${aIdx}`, scene);
+      pistonCompRoot.position.set(Math.cos(lockAngle) * (sleeveRadius - 0.25), 0.11, Math.sin(lockAngle) * (sleeveRadius - 0.25));
+      pistonCompRoot.rotation.y = -lockAngle;
+      pistonCyl.parent = pistonCompRoot;
+      pistonCyl.position.set(0, 0, -0.15); // slide offset inside parent root space
+
+      // Locking latch claw wedge at the inner end of the piston shaft
+      const clawWedge = MeshBuilder.CreateBox(`hydroClaw_${aIdx}`, {
+        width: 0.28,
+        height: 0.18,
+        depth: 0.22
+      }, scene);
+      clawWedge.material = hydraulicClawMat;
+      clawWedge.parent = pistonCompRoot;
+      clawWedge.position.set(0, 0, -0.42); // sits in front of piston tip
+
+      // Push to animated references
+      hydraulicLockersRef.current.push({
+        sleeve: sleeveBox,
+        piston: pistonCompRoot,
+        clamp: clawWedge,
+        angle: lockAngle,
+        currentExtension: 0
+      });
+    });
+
+    // 3. SECURED RAILS & SUPPORT SLEEPERS
+    const rail1 = MeshBuilder.CreateBox("railLeft", { width: 22, height: 0.08, depth: 0.08 }, scene);
+    rail1.position.set(0, 0.08, 0.7);
+    const rail2 = MeshBuilder.CreateBox("railRight", { width: 22, height: 0.08, depth: 0.08 }, scene);
+    rail2.position.set(0, 0.08, -0.7);
     
     const railMat = new StandardMaterial("railMat", scene);
-    railMat.diffuseColor = new Color3(0.2, 0.23, 0.26);
-    railMat.specularColor = new Color3(0.5, 0.5, 0.5);
+    railMat.diffuseColor = new Color3(0.25, 0.28, 0.32);
+    railMat.specularColor = new Color3(0.7, 0.75, 0.8);
     rail1.material = railMat;
     rail2.material = railMat;
 
-    // Steel Girders
-    const girder1 = MeshBuilder.CreateBox("girder1", { width: 0.2, height: 5.5, depth: 0.2 }, scene);
-    girder1.position.set(-6, 2.75, -4);
-    const girder2 = MeshBuilder.CreateBox("girder2", { width: 0.2, height: 5.5, depth: 0.2 }, scene);
-    girder2.position.set(6, 2.75, -4);
-    const girderCross = MeshBuilder.CreateBox("girderCross", { width: 12.2, height: 0.2, depth: 0.2 }, scene);
-    girderCross.position.set(0, 5.4, -4);
-    
-    const structureMat = new StandardMaterial("structureMat", scene);
-    structureMat.diffuseColor = new Color3(0.1, 0.11, 0.15);
-    structureMat.specularColor = new Color3(0.03, 0.03, 0.03);
-    girder1.material = structureMat;
-    girder2.material = structureMat;
-    girderCross.material = structureMat;
+    // Layout rail sleepers every 1.2 meters
+    const sleeperMat = new StandardMaterial("sleeperMat", scene);
+    sleeperMat.diffuseColor = new Color3(0.12, 0.14, 0.18);
+    sleeperMat.specularColor = new Color3(0.2, 0.2, 0.2);
+    for (let x = -10.5; x <= 10.5; x += 1.2) {
+      const sleeper = MeshBuilder.CreateBox(`sleeper_${x}`, { width: 0.24, height: 0.04, depth: 1.8 }, scene);
+      sleeper.position.set(x, 0.02, 0);
+      sleeper.material = sleeperMat;
 
-    // FREIGHT CONTAINER CAR
+      // Miniature bolts on rail fasteners
+      const bL = MeshBuilder.CreateBox(`boltL_${x}`, { size: 0.04 }, scene);
+      bL.position.set(x, 0.06, 0.7);
+      bL.material = railMat;
+
+      const bR = MeshBuilder.CreateBox(`boltR_${x}`, { size: 0.04 }, scene);
+      bR.position.set(x, 0.06, -0.7);
+      bR.material = railMat;
+    }
+
+    // 4. OVERHEAD GANTRY CRANE STRUCTURE & VERTICAL SUPPORT RIGS
+    const columnPowerMat = new StandardMaterial("columnPowerMat", scene);
+    columnPowerMat.diffuseColor = new Color3(0.1, 0.12, 0.16);
+    columnPowerMat.specularColor = new Color3(0.3, 0.3, 0.3);
+
+    // 4 massive support columns at corners of the bay
+    const colCoords = [
+      { x: -8.5, z: 5.2 },
+      { x: 8.5, z: 5.2 },
+      { x: -8.5, z: -5.2 },
+      { x: 8.5, z: -5.2 }
+    ];
+    colCoords.forEach((coord, i) => {
+      const col = MeshBuilder.CreateBox(`col_${i}`, { width: 0.5, height: 6.2, depth: 0.5 }, scene);
+      col.position.set(coord.x, 3.1, coord.z);
+      col.material = columnPowerMat;
+
+      // Vertical support braces
+      const brace = MeshBuilder.CreateBox(`colBrace_${i}`, { width: 0.6, height: 0.2, depth: 0.6 }, scene);
+      brace.position.set(coord.x, 6.0, coord.z);
+      brace.material = columnPowerMat;
+    });
+
+    // Overhead Runway Tracks running horizontally
+    const runwayL = MeshBuilder.CreateBox("runwayL", { width: 22, height: 0.3, depth: 0.3 }, scene);
+    runwayL.position.set(0, 5.9, 5.2);
+    runwayL.material = columnPowerMat;
+
+    const runwayR = MeshBuilder.CreateBox("runwayR", { width: 22, height: 0.3, depth: 0.3 }, scene);
+    runwayR.position.set(0, 5.9, -5.2);
+    runwayR.material = columnPowerMat;
+
+    // The traversable Gantry Crane beam
+    const gantryBeam = MeshBuilder.CreateBox("overarchingGantryBeam", { width: 0.6, height: 0.4, depth: 10.6 }, scene);
+    gantryBeam.position.set(0, 6.1, 0);
+    gantryBeam.material = columnPowerMat;
+
+    // Crane Trolley block (Will slide real-time along with Train movement!)
+    const gantryTrolley = MeshBuilder.CreateBox("gantryTrolleyNode", { width: 1.5, height: 0.5, depth: 1.5 }, scene);
+    gantryTrolley.parent = gantryBeam;
+    gantryTrolley.position.set(0, -0.3, 0);
+    const trolleyMat = new StandardMaterial("trolleyMat", scene);
+    trolleyMat.diffuseColor = new Color3(0.2, 0.15, 0.05); // Industrial yellow
+    trolleyMat.specularColor = new Color3(0.6, 0.5, 0.2);
+    gantryTrolley.material = trolleyMat;
+    gantryTrolleyRef.current = gantryBeam; // Saved so animation loop updates its horizontal position!
+
+    // Overhead industrial cables hanging from runway girders
+    const runwayCable = MeshBuilder.CreateBox("runwayCableTrack", { width: 22, height: 0.05, depth: 0.05 }, scene);
+    runwayCable.position.set(0, 5.7, 5.15);
+    const cableDarkMat = new StandardMaterial("cableDarkMat", scene);
+    cableDarkMat.diffuseColor = new Color3(0.05, 0.05, 0.05);
+    cableDarkMat.specularColor = new Color3(0.1, 0.1, 0.1);
+    runwayCable.material = cableDarkMat;
+
+    // 5. INDUSTRIAL REAR DOCK WALLS (Immersive Dieselpunk Cathedral Cage)
+    const wallPlates = MeshBuilder.CreateBox("dockRearWall", { width: 22, height: 6.5, depth: 0.15 }, scene);
+    wallPlates.position.set(0, 3.25, -5.5);
+    const wallPlateMat = new StandardMaterial("wallPlateMat", scene);
+    wallPlateMat.diffuseColor = new Color3(0.05, 0.06, 0.08);
+    wallPlateMat.specularColor = new Color3(0.1, 0.1, 0.1);
+    wallPlates.material = wallPlateMat;
+
+    // Vertical wall ribs
+    for (let x = -9; x <= 9; x += 4.5) {
+      const wallPillar = MeshBuilder.CreateBox(`wallPillar_${x}`, { width: 0.35, height: 6.5, depth: 0.25 }, scene);
+      wallPillar.position.set(x, 3.25, -5.35);
+      wallPillar.material = columnPowerMat;
+
+      // Wall junction control boxes
+      if (x % 9 === 0) {
+        const juncBox = MeshBuilder.CreateBox(`junctionBox_${x}`, { width: 0.6, height: 0.8, depth: 0.3 }, scene);
+        juncBox.position.set(x, 2.0, -5.15);
+        const juncMat = new StandardMaterial("juncMat", scene);
+        juncMat.diffuseColor = new Color3(0.25, 0.08, 0.08); // Emergency red
+        juncMat.emissiveColor = new Color3(0.08, 0.02, 0.02);
+        juncBox.material = juncMat;
+      }
+    }
+
+    // 6. ARTICULATED MANIPULATOR ROBOT REPAIR ARMS (Constructed symmetrically with idle motion links)
+    const manipulatorArmCoords = [
+      { x: -2.8, z: 2.8, yOffset: 0.0 },
+      { x: 2.8, z: -2.8, yOffset: 2.0 },
+      { x: -1.2, z: -3.2, yOffset: 4.0 }
+    ];
+    const armList: any[] = [];
+    manipulatorArmCoords.forEach((coord, idx) => {
+      const armRoot = new TransformNode(`armRoot_${idx}`, scene);
+      armRoot.position.set(coord.x, 0.1, coord.z);
+
+      // Hydraulic anchor turntable turntable
+      const armBase = MeshBuilder.CreateCylinder(`armBase_${idx}`, { diameter: 0.6, height: 0.25 }, scene);
+      armBase.parent = armRoot;
+      armBase.position.y = 0.1;
+      armBase.material = trolleyMat;
+
+      // Lower segment arm cylinder
+      const lowerArm = MeshBuilder.CreateCylinder(`lowerArm_${idx}`, { diameter: 0.14, height: 1.4 }, scene);
+      lowerArm.parent = armRoot;
+      lowerArm.position.set(0, 0.8, 0);
+      lowerArm.rotation.x = Math.PI / 10;
+      lowerArm.material = columnPowerMat;
+
+      // Mid joint sphere pivot
+      const armJoint = MeshBuilder.CreateSphere(`armJoint_${idx}`, { diameter: 0.22 }, scene);
+      armJoint.parent = armRoot;
+      armJoint.position.set(0, 1.4, 0.2);
+      armJoint.material = railMat;
+
+      // Upper segment arm cylinder
+      const upperArm = MeshBuilder.CreateCylinder(`upperArm_${idx}`, { diameter: 0.1, height: 1.0 }, scene);
+      upperArm.parent = armRoot;
+      upperArm.position.set(0, 1.8, 0.0);
+      upperArm.rotation.x = -Math.PI / 5;
+      upperArm.material = columnPowerMat;
+
+      // Welder / plasma cutter head
+      const toolHead = MeshBuilder.CreateBox(`toolHead_${idx}`, { width: 0.15, height: 0.3, depth: 0.15 }, scene);
+      toolHead.parent = armRoot;
+      toolHead.position.set(0, 2.2, -0.3);
+      toolHead.material = trolleyMat;
+
+      const nozzleGlow = MeshBuilder.CreateSphere(`toolNozzle_${idx}`, { diameter: 0.08 }, scene);
+      nozzleGlow.parent = toolHead;
+      nozzleGlow.position.y = -0.16;
+      const nozzleMat = new StandardMaterial("nozzleMat", scene);
+      nozzleMat.emissiveColor = new Color3(1.0, 0.4, 0.0);
+      nozzleGlow.material = nozzleMat;
+
+      armList.push({
+        base: armRoot,
+        lowerArm: lowerArm,
+        upperArm: upperArm,
+        toolHead: toolHead,
+        angleOffset: coord.yOffset
+      });
+    });
+    repairArmsRef.current = armList;
+
+    // 7. ABYSSUM INTERACTIVE ORACLE TOTEMS (Monolithic pylons bounding the coupling zone)
+    const totemPlacements = [
+      { angle: 0, r: 2.3 },
+      { angle: (Math.PI * 2) / 3, r: 2.3 },
+      { angle: (Math.PI * 4) / 3, r: 2.3 }
+    ];
+    const totemsArray: any[] = [];
+    totemPlacements.forEach((place, idx) => {
+      const tx = Math.cos(place.angle) * place.r;
+      const tz = Math.sin(place.angle) * place.r;
+      
+      const pylon = MeshBuilder.CreateBox(`oracleTotem_${idx}`, { width: 0.35, height: 2.2, depth: 0.22 }, scene);
+      pylon.position.set(tx, 1.1, tz);
+      
+      const obsidianMat = new StandardMaterial("obsidianMat", scene);
+      obsidianMat.diffuseColor = new Color3(0.04, 0.05, 0.05);
+      obsidianMat.specularColor = new Color3(0.6, 0.6, 0.6);
+      pylon.material = obsidianMat;
+
+      // Floating rune band around each totem pylon
+      const floatingTorus = MeshBuilder.CreateTorus(`totemTorus_${idx}`, { diameter: 0.55, thickness: 0.04, tessellation: 16 }, scene);
+      floatingTorus.position.set(tx, 1.6, tz);
+      
+      // Dynamic route color mapped to the floating rings via abexConduitsRef array
+      const ringGlowMat = new StandardMaterial(`totemGlowMat_${idx}`, scene);
+      ringGlowMat.emissiveColor = new Color3(0.0, 0.9, 1.0); // Starts cyan
+      floatingTorus.material = ringGlowMat;
+      totemsArray.push(floatingTorus);
+    });
+    abexConduitsRef.current = totemsArray;
+
+    // 8. MOAI OBSERVER SENTINEL NODE (Hovering overhead diagnostic scanner drone)
+    const observerBase = new TransformNode("observerDroneRoot", scene);
+    observerBase.position.set(0, 4.8, -1.8);
+    
+    const eyeBall = MeshBuilder.CreateSphere("observerSphericalEye", { diameter: 0.4 }, scene);
+    eyeBall.parent = observerBase;
+    
+    const darkChromeMat = new StandardMaterial("darkChromeMat", scene);
+    darkChromeMat.diffuseColor = new Color3(0.12, 0.12, 0.15);
+    darkChromeMat.specularColor = new Color3(0.9, 0.9, 0.9);
+    eyeBall.material = darkChromeMat;
+
+    const holographicLens = MeshBuilder.CreateSphere("lensPupil", { diameter: 0.2 }, scene);
+    holographicLens.parent = eyeBall;
+    holographicLens.position.set(0, -0.06, 0.18);
+    
+    const lensMat = new StandardMaterial("lensMat", scene);
+    lensMat.emissiveColor = new Color3(0.0, 0.85, 1.0); 
+    lensMat.disableLighting = true;
+    holographicLens.material = lensMat;
+    observerNodeRef.current = observerBase;
+
+    // =========================================================================
+    // 9. HIGH-DENSITY UPGRADED FREIGHT TRAIN MECHANICAL ASSEMBLY
+    // =========================================================================
     const carriageRoot = new TransformNode("carRootNode", scene);
     rootNodeRef.current = carriageRoot;
     carriageRoot.position.y = 0.5; 
 
-    const chassis = MeshBuilder.CreateBox("carChassis", { width: 4.2, height: 0.3, depth: 1.8 }, scene);
+    // Heavy Main Armored Under-carriage Chassis frame
+    const chassis = MeshBuilder.CreateBox("carChassis", { width: 4.2, height: 0.35, depth: 1.84 }, scene);
     chassis.parent = carriageRoot;
     chassis.position.set(0, -0.15, 0);
     const chassisMat = new StandardMaterial("chassisBlockMat", scene);
-    chassisMat.diffuseColor = new Color3(0.12, 0.13, 0.16);
-    chassisMat.specularColor = new Color3(0.3, 0.35, 0.4);
+    chassisMat.diffuseColor = new Color3(0.12, 0.14, 0.17);
+    chassisMat.specularColor = new Color3(0.4, 0.45, 0.5);
     chassis.material = chassisMat;
 
-    const bodyBox = MeshBuilder.CreateBox("carBody", { width: 3.8, height: 1.6, depth: 1.6 }, scene);
+    // Primary Armored Cargo Tank Carriage body
+    const bodyBox = MeshBuilder.CreateBox("carBody", { width: 3.8, height: 1.5, depth: 1.6 }, scene);
     bodyBox.parent = carriageRoot;
-    bodyBox.position.set(0, 0.8, 0);
+    bodyBox.position.set(0, 0.75, 0);
     const bodyMat = new StandardMaterial("bodyBlockMat", scene);
-    bodyMat.diffuseColor = new Color3(0.18, 0.21, 0.25); // Heavy armored plating
-    bodyMat.specularColor = new Color3(0.15, 0.15, 0.15);
+    bodyMat.diffuseColor = new Color3(0.15, 0.17, 0.22); // Armored steel
+    bodyMat.specularColor = new Color3(0.2, 0.2, 0.22);
     bodyBox.material = bodyMat;
 
-    const decalCore = MeshBuilder.CreateBox("decalPlate", { width: 1.8, height: 0.5, depth: 1.63 }, scene);
+    // Glowing core reactor slot (The decal central capsule)
+    const decalCore = MeshBuilder.CreateBox("decalPlate", { width: 1.85, height: 0.45, depth: 1.63 }, scene);
     decalCore.parent = carriageRoot;
-    decalCore.position.set(0, 0.8, 0);
+    decalCore.position.set(0, 0.75, 0);
     const decalMat = new StandardMaterial("decalBlockMat", scene);
-    decalMat.diffuseColor = new Color3(0.03, 0.04, 0.05);
-    decalMat.emissiveColor = new Color3(0.0, 0.6, 0.9); // Indigo/Teal Reactor core glow
+    decalMat.diffuseColor = new Color3(0.02, 0.03, 0.04);
+    decalMat.emissiveColor = new Color3(0.0, 0.7, 1.0); // Indigo/Teal Reactor core glow
     decalCore.material = decalMat;
 
-    // Side armor reinforcing bars
+    // A. THERMAL SHIELD PANELING (Raised modular layered armor panels on body sides & roof top)
+    const shieldPlateMat = new StandardMaterial("shieldPlateMat", scene);
+    shieldPlateMat.diffuseColor = new Color3(0.26, 0.28, 0.32); // Steel slate shield plates
+    shieldPlateMat.specularColor = new Color3(0.75, 0.6, 0.25); // Gold/bronze metallic trim highlights
+
+    // Roof thermal panels
+    const roofShield1 = MeshBuilder.CreateBox("roofShieldAngleL", { width: 1.6, height: 0.1, depth: 0.8 }, scene);
+    roofShield1.parent = carriageRoot;
+    roofShield1.position.set(-0.8, 1.55, 0.4);
+    roofShield1.rotation.z = Math.PI / 18; // Slight angle shield tilt
+    roofShield1.material = shieldPlateMat;
+
+    const roofShield2 = MeshBuilder.CreateBox("roofShieldAngleR", { width: 1.6, height: 0.1, depth: 0.8 }, scene);
+    roofShield2.parent = carriageRoot;
+    roofShield2.position.set(0.8, 1.55, -0.4);
+    roofShield2.rotation.z = -Math.PI / 18;
+    roofShield2.material = shieldPlateMat;
+
+    // B. ROTATING COOLING FANS
+    const fanBladesArray: any[] = [];
+    const fanSides = [0.81, -0.81];
+    fanSides.forEach((zSide, fIdx) => {
+      // Fan Shroud Outer casing Ring
+      const fanHous = MeshBuilder.CreateCylinder(`coolingFanHousing_${fIdx}`, {
+        diameter: 0.6,
+        height: 0.06,
+        tessellation: 16
+      }, scene);
+      fanHous.parent = carriageRoot;
+      fanHous.position.set(0, 0.75, zSide);
+      fanHous.rotation.x = Math.PI / 2;
+      fanHous.material = columnPowerMat;
+
+      // Center spinning blade hub spinner
+      const bladeHub = MeshBuilder.CreateCylinder(`bladeHub_${fIdx}`, {
+        diameter: 0.15,
+        height: 0.08,
+        tessellation: 8
+      }, scene);
+      bladeHub.parent = carriageRoot;
+      bladeHub.position.set(0, 0.75, zSide * 1.05);
+      bladeHub.rotation.x = Math.PI / 2;
+      bladeHub.material = shieldPlateMat;
+
+      // 4 interior mechanical fan blades
+      const linkRoot = new TransformNode(`fanLinkRoot_${fIdx}`, scene);
+      linkRoot.parent = carriageRoot;
+      linkRoot.position.set(0, 0.75, zSide * 1.05);
+      linkRoot.rotation.z = 0; // Rotates real-time in the animation loop!
+
+      for (let b = 0; b < 4; b++) {
+        const blade = MeshBuilder.CreateBox(`fanBlade_${fIdx}_${b}`, {
+          width: 0.06,
+          height: 0.22,
+          depth: 0.01
+        }, scene);
+        blade.parent = linkRoot;
+        blade.position.y = 0.12; 
+        blade.rotation.z = (b * Math.PI) / 2;
+        blade.rotation.y = Math.PI / 8; // Slit angle pitch
+        
+        const darkMetalMat = new StandardMaterial("darkMetalMat", scene);
+        darkMetalMat.diffuseColor = new Color3(0.08, 0.08, 0.09);
+        blade.material = darkMetalMat;
+      }
+      fanBladesArray.push(linkRoot);
+    });
+    fanBladesRef.current = fanBladesArray;
+
+    // C. STEAM-VENT VALVE EXHAUST PIPES
+    const exhaustMat = new StandardMaterial("exhaustMat", scene);
+    exhaustMat.diffuseColor = new Color3(0.12, 0.12, 0.15);
+    exhaustMat.specularColor = new Color3(0.4, 0.4, 0.4);
+
+    const pipeLeft = MeshBuilder.CreateCylinder("exhaustLeft", { diameter: 0.12, height: 0.4, tessellation: 8 }, scene);
+    pipeLeft.parent = carriageRoot;
+    pipeLeft.position.set(-1.6, 1.6, 0.45);
+    pipeLeft.rotation.z = -Math.PI / 8; // Angled back exhaust pipes
+    pipeLeft.material = exhaustMat;
+
+    const pipeRight = MeshBuilder.CreateCylinder("exhaustRight", { diameter: 0.12, height: 0.4, tessellation: 8 }, scene);
+    pipeRight.parent = carriageRoot;
+    pipeRight.position.set(-1.6, 1.6, -0.45);
+    pipeRight.rotation.z = -Math.PI / 8;
+    pipeRight.material = exhaustMat;
+
+    // Heavy reinforced Side armor plates
     const plateL = MeshBuilder.CreateBox("plateL", { width: 3.9, height: 0.6, depth: 0.15 }, scene);
     plateL.parent = carriageRoot;
     plateL.position.set(0, 0.4, 0.81);
@@ -509,11 +1511,8 @@ export const RepairBay3D: React.FC<Props> = ({
     plateR.parent = carriageRoot;
     plateR.position.set(0, 0.4, -0.81);
     
-    const armorPlateMat = new StandardMaterial("armorPlateMat", scene);
-    armorPlateMat.diffuseColor = new Color3(0.08, 0.09, 0.11);
-    armorPlateMat.specularColor = new Color3(0.35, 0.35, 0.35);
-    plateL.material = armorPlateMat;
-    plateR.material = armorPlateMat;
+    plateL.material = shieldPlateMat;
+    plateR.material = shieldPlateMat;
 
     // Cylinder wheels
     const wheelPositions = [
@@ -700,17 +1699,151 @@ export const RepairBay3D: React.FC<Props> = ({
         }
         carriageRoot.position.x = currentPos;
         carriageRoot.position.y = 0.5 + Math.sin(now / 350) * 0.025; // hovering floating suspension
+
+        // 1. ROTATE FAN BLADES RELATIVE TO MOVEMENT + BASE ROTATION HUM
+        fanBladesRef.current.forEach((fanLink, fIdx) => {
+          if (fanLink && !fanLink.isDisposed()) {
+            const spinVelocity = 0.12 + Math.abs(positionRef.current - positionRef.current) * 0.2;
+            fanLink.rotation.z += (fIdx % 2 === 0 ? spinVelocity : -spinVelocity);
+          }
+        });
+
+        // 2. PROCEDURAL STEAM-VENT EXHAUST PUFF PARTICLES (Emit from the two angled exhausts)
+        if (scene && Math.random() > 0.72) {
+          const isLeft = Math.random() > 0.5;
+          const sx = carriageRoot.position.x - 1.6;
+          const sy = carriageRoot.position.y + 1.25;
+          const sz = carriageRoot.position.z + (isLeft ? 0.45 : -0.45);
+
+          const steamCloud = MeshBuilder.CreateSphere("steamVentCloud", {
+            diameter: 0.1,
+            segments: 4
+          }, scene);
+          steamCloud.position.set(sx, sy, sz);
+
+          const steamMat = new StandardMaterial("proceduralSteamMat", scene);
+          steamMat.diffuseColor = new Color3(0.65, 0.68, 0.75);
+          steamMat.emissiveColor = new Color3(0.02, 0.02, 0.03);
+          steamMat.alpha = 0.45;
+          steamMat.disableLighting = true;
+          steamCloud.material = steamMat;
+
+          steamRef.current.push({
+            mesh: steamCloud,
+            vy: 0.015 + Math.random() * 0.012,
+            vx: -0.01 - Math.random() * 0.01, // backward puff force
+            vz: (Math.random() - 0.5) * 0.01,
+            life: 1.0,
+            size: 0.1
+          });
+        }
       }
 
-      const wheelRotation = positionRef.current * 2.2;
-      carriageRoot.getChildMeshes().forEach(m => {
-        if (m.name.startsWith("wheel")) {
-          m.rotation.y = wheelRotation;
+      // Update and fade steam particles smoothly
+      steamRef.current.forEach((sp, sIdx) => {
+        sp.mesh.position.y += sp.vy;
+        sp.mesh.position.x += sp.vx;
+        sp.mesh.position.z += sp.vz;
+        sp.life -= 0.025; // Particle decay
+        sp.size += 0.025; // Expand as it rises
+        sp.mesh.scaling.set(sp.size / 0.1, sp.size / 0.1, sp.size / 0.1);
+        
+        if (sp.mesh.material) {
+          (sp.mesh.material as StandardMaterial).alpha = sp.life * 0.45;
+        }
+
+        if (sp.life <= 0) {
+          sp.mesh.dispose();
+          steamRef.current.splice(sIdx, 1);
         }
       });
 
+      // 3. ARTICULATED ROBOT REPAIR ARMS IDLE WIGGLE & ACTIVE SEEK
+      repairArmsRef.current.forEach((arm, armIdx) => {
+        if (arm.base && !arm.base.isDisposed()) {
+          const pulseSpeed = now * 0.0015 + arm.angleOffset;
+          // Hover and trace sinusoidal rhythm
+          arm.base.rotation.y = Math.sin(pulseSpeed) * 0.18;
+          arm.lowerArm.rotation.x = Math.PI / 10 + Math.sin(pulseSpeed * 0.7) * 0.06;
+          arm.upperArm.rotation.x = -Math.PI / 5 + Math.cos(pulseSpeed * 0.8) * 0.05;
+          
+          if (arm.toolHead) {
+            arm.toolHead.rotation.y = Math.sin(pulseSpeed * 1.2) * 0.12;
+          }
+        }
+      });
+
+      // 4. ROTATE PIT COG GEARS IN SUB-FLOOR MATRIX (Spin faster during coaxial burst!)
+      const gearSpinSpeed = isCoaxialBurstActiveRef.current ? 0.14 : 0.012;
+      couplingGearsRef.current.forEach((gear, gIdx) => {
+        if (gear && !gear.isDisposed()) {
+          gear.rotation.y += (gIdx % 2 === 0 ? gearSpinSpeed : -gearSpinSpeed);
+        }
+      });
+
+      // 5. OBSERVER SENTINEL EYE SWAY & HOVER
+      if (observerNodeRef.current && !observerNodeRef.current.isDisposed()) {
+        observerNodeRef.current.position.y = 4.8 + Math.sin(now / 480) * 0.18;
+        observerNodeRef.current.rotation.y = Math.cos(now / 1200) * 0.25;
+        observerNodeRef.current.rotation.z = Math.sin(now / 950) * 0.05;
+      }
+
+      // 6. OVERHEAD GANTRY CRANE ALIGNMENT (Follows Train along Runway rails)
+      if (gantryTrolleyRef.current && !gantryTrolleyRef.current.isDisposed() && carriageRoot) {
+        gantryTrolleyRef.current.position.x = carriageRoot.position.x;
+      }
+
+      // 7. MONOLITH OVERLAY COUPLER SPIN
+      abexConduitsRef.current.forEach((ringTorus, rIdx) => {
+        if (ringTorus && !ringTorus.isDisposed()) {
+          ringTorus.rotation.y = now * 0.0015 + rIdx;
+          ringTorus.position.y = 1.6 + Math.sin(now / 320 + rIdx) * 0.05;
+        }
+      });
+
+      // 8. LANCE ORBITING CONCENTRATION RINGS SPIN
+      if (lanceRingsRef.current && lanceRingsRef.current.length > 0) {
+        lanceRingsRef.current.forEach((ring, idx) => {
+          if (ring && !ring.isDisposed()) {
+            const orbit = now * 0.0022;
+            ring.rotation.y = orbit * (idx % 2 === 0 ? 1 : -1);
+            ring.rotation.x = Math.sin(orbit * 0.4) * 0.25;
+            const stretch = 1.0 + Math.sin(orbit + idx) * 0.04;
+            ring.scaling.set(stretch, 1.0, stretch);
+          }
+        });
+      }
+
+      // 9. ANIMATE HYDRAULIC LOCKING MECHANISMS SURROUNDING CENTRAL COUPLING RING
       const offset = Math.abs(positionRef.current);
       const inProximityRange = offset < 0.65;
+
+      if (hydraulicLockersRef.current && hydraulicLockersRef.current.length > 0) {
+        hydraulicLockersRef.current.forEach(locker => {
+          const targetExtension = inProximityRange ? 0.42 : 0.0;
+          // Smoothly interpolate currentExtension toward targetExtension
+          locker.currentExtension += (targetExtension - locker.currentExtension) * 0.12;
+          
+          const currentR = 2.3 - 0.25 - locker.currentExtension;
+          if (locker.piston && !locker.piston.isDisposed()) {
+            locker.piston.position.set(
+              Math.cos(locker.angle) * currentR,
+              0.11,
+              Math.sin(locker.angle) * currentR
+            );
+          }
+        });
+      }
+
+      if (carriageRoot) {
+        const wheelRotation = positionRef.current * 2.2;
+        carriageRoot.getChildMeshes().forEach(m => {
+          if (m.name.startsWith("wheel")) {
+            m.rotation.y = wheelRotation;
+          }
+        });
+      }
+
       setProximityActive(inProximityRange);
 
       if (floorRing && floorRing.material) {
@@ -810,6 +1943,17 @@ export const RepairBay3D: React.FC<Props> = ({
       });
 
       if (camera) {
+        if (isCoaxialBurstActiveRef.current) {
+          const shake = 0.09;
+          camera.target.x = 0 + (Math.random() - 0.5) * shake;
+          camera.target.y = 0.7 + (Math.random() - 0.5) * shake;
+          camera.target.z = 0 + (Math.random() - 0.5) * shake;
+        } else {
+          camera.target.x += (0 - camera.target.x) * 0.15;
+          camera.target.y += (0.7 - camera.target.y) * 0.15;
+          camera.target.z += (0 - camera.target.z) * 0.15;
+        }
+
         if (snapToGridRef.current === '15') {
           const rad15 = 15 * Math.PI / 180;
           camera.alpha = Math.round(camera.alpha / rad15) * rad15;
@@ -825,6 +1969,11 @@ export const RepairBay3D: React.FC<Props> = ({
 
     engine.runRenderLoop(mainLoop);
 
+    // Initial construction of the customizable weapon lance upon scene ready
+    setTimeout(() => {
+      applyLanceConstruction();
+    }, 120);
+
     const resizeObserver = new ResizeObserver((entries) => {
       if (engine) engine.resize();
     });
@@ -836,6 +1985,9 @@ export const RepairBay3D: React.FC<Props> = ({
       resizeObserver.disconnect();
       engine.dispose();
       sparksRef.current.forEach(sp => sp.mesh.dispose());
+      steamRef.current.forEach(sp => {
+        if (sp.mesh) sp.mesh.dispose();
+      });
     };
   }, [originalQuery]);
 
@@ -923,16 +2075,47 @@ export const RepairBay3D: React.FC<Props> = ({
           <div className="p-2 bg-[#0a141e]/80 border border-cyan-500/30 text-cyan-400 font-mono text-[10px] rounded font-black tracking-widest animate-pulse shadow-[inset_0_1px_8px_rgba(6,182,212,0.15)] shrink-0 self-center">
             DECK P-7 // OPERATIVE
           </div>
-          <div>
+          <div className="flex flex-col gap-1">
             <h1 className="text-sm font-mono font-black uppercase tracking-[0.25em] text-cyan-100 flex items-center gap-2">
               <Layers size={15} className="text-cyan-400 animate-pulse" />
               ORACLE_BRIDGE // FREIGHT COCKPIT
             </h1>
-            <p className="text-[8px] font-mono text-amber-600/80 uppercase tracking-widest mt-0.5 font-bold flex items-center gap-1.5">
+            <p className="text-[8px] font-mono text-amber-600/80 uppercase tracking-widest mt-0.5 font-bold flex items-center gap-1.5 leading-none">
               <span>● COCKPIT SYSTEM STATUS: OPERATIONAL</span>
               <span className="text-zinc-650 font-normal">|</span>
               <span className="text-zinc-400">MODEL RECEPTOR REFRACT-V2</span>
             </p>
+            {/* Immersive Diegetic Workspace Selector Tabs */}
+            <div className="flex items-center gap-2 mt-2 select-none">
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveDeskTab('hologram');
+                  addLog("MTD COCKPIT // SWITCHING TELEMETRY STREAM TO DECK MONITOR ASSEMBLY");
+                }}
+                className={`px-3 py-1 text-[8px] font-mono font-black tracking-widest uppercase border cursor-pointer transition-all duration-300 ${
+                  activeDeskTab === 'hologram'
+                    ? "bg-[#0c1d2e]/90 border-cyan-500/80 text-cyan-300 shadow-[0_0_12px_rgba(6,182,212,0.25)]"
+                    : "bg-[#03060a]/90 border-zinc-800 text-zinc-500 hover:text-zinc-350 hover:border-zinc-700"
+                }`}
+              >
+                🛰️ DECK MONITOR (HOVER COCKPIT)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveDeskTab('inspection');
+                  addLog("MTD COCKPIT // ALIGNING FREQUENCY CONDUITS TO FIELD UNIT INSPECTOR GATE");
+                }}
+                className={`px-3 py-1 text-[8px] font-mono font-black tracking-widest uppercase border cursor-pointer transition-all duration-300 ${
+                  activeDeskTab === 'inspection'
+                    ? "bg-[#251a0b]/90 border-amber-500/80 text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.25)]"
+                    : "bg-[#03060a]/90 border-zinc-800 text-zinc-500 hover:text-zinc-350 hover:border-zinc-700"
+                }`}
+              >
+                🔬 FIELD UNIT INSPECTION MODULE
+              </button>
+            </div>
           </div>
         </div>
 
@@ -955,8 +2138,9 @@ export const RepairBay3D: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* Main Structural Cockpit Panel Grid Layout */}
-      <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-5 relative z-10" ref={containerRef}>
+      {/* Dynamic Tab Panel Switching */}
+      {activeDeskTab === 'hologram' ? (
+        <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-5 relative z-10" ref={containerRef}>
         
         {/* ================= LEFT WING CONTROLS (Tension and Resources) ================= */}
         <div className="lg:col-span-3 flex flex-col gap-4 order-2 lg:order-1 select-none">
@@ -1295,7 +2479,16 @@ export const RepairBay3D: React.FC<Props> = ({
               </div>
 
               {/* Direct Weld Deployers */}
-              <div className="w-full md:w-auto shrink-0 flex items-center justify-end">
+              <div className="w-full md:w-auto shrink-0 flex items-center justify-end gap-2.5">
+                {/* Custom Coaxial Lance Forge trigger */}
+                <button
+                  onClick={() => setIsLanceModalOpen(true)}
+                  className="py-1.5 px-3 bg-amber-950/20 hover:bg-amber-950/45 border border-amber-500/40 hover:border-amber-400 text-amber-300 font-mono text-[8.5px] font-black uppercase tracking-widest rounded-sm flex items-center justify-center gap-1 transition-all shadow-[0_0_12px_rgba(245,158,11,0.12)] active:scale-98 cursor-pointer"
+                >
+                  <Flame size={10} className="animate-pulse text-amber-400" />
+                  <span>LANCE FORGE</span>
+                </button>
+
                 {repairStep === 'weld-locked' || !proximityActive ? (
                   <div className="text-right flex flex-col items-end pr-1">
                     <span className="text-[6.5px] font-mono text-zinc-500 uppercase tracking-widest block leading-none">
@@ -1783,6 +2976,291 @@ export const RepairBay3D: React.FC<Props> = ({
         </div>
 
       </div>
+      ) : (
+        /* ================= FIELD UNIT INSPECTION MODULE ================= */
+        <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-5 relative z-10 font-mono text-zinc-300">
+          
+          {/* LEFT WING - KEYCAP PROTOCOLS LIST */}
+          <div className="lg:col-span-3 flex flex-col gap-4">
+            <div className="p-4 bg-[#0a0f15]/95 border border-zinc-800 relative flex flex-col gap-3 min-h-[400px] shadow-[inset_0_1px_8px_rgba(0,0,0,0.8)]">
+              {/* Corner rivets */}
+              <div className="absolute top-1 left-1 w-1.5 h-1.5 rounded-full bg-zinc-700 pointer-events-none" />
+              <div className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-zinc-700 pointer-events-none" />
+              <div className="absolute bottom-1 right-1 w-1.5 h-1.5 rounded-full bg-zinc-700 pointer-events-none" />
+              <div className="absolute bottom-1 left-1 w-1.5 h-1.5 rounded-full bg-zinc-700 pointer-events-none" />
+
+              <div className="border-b border-zinc-805 pb-2 flex justify-between items-center">
+                <span className="text-[10px] font-black uppercase text-amber-500 tracking-wider">ASM CONSTRUCT KEYS</span>
+                <span className="text-[7.5px] text-zinc-650 font-bold">MODE: CALIBRATE</span>
+              </div>
+
+              {/* Description banner */}
+              <div className="bg-amber-955/20 border border-amber-800/10 p-2.5 text-[8.5px] leading-relaxed text-amber-500/80 uppercase">
+                INTELLIGENT TELEMETRY KEYBOARD MONITOR ACTIVE. PRESS PHYSICAL KEYS ON YOUR SYSTEM CONTROLLER TO ENGAGE TRANSMISSION DECK STREAMS.
+              </div>
+
+              {/* Dynamic Keys list */}
+              <div className="flex flex-col gap-2 mt-1">
+                {[
+                  { key: 'W/S', label: 'WALK EXP VECTOR', active: pressedKeys['w'] || pressedKeys['s'] },
+                  { key: 'A/D', label: 'STRAFE VECTOR', active: pressedKeys['a'] || pressedKeys['d'] },
+                  { key: 'SPACE', label: 'GRAVITY JUMP', active: pressedKeys[' '] },
+                  { key: 'F', label: 'CLOSE QUARTERS FIST', active: pressedKeys['f'] },
+                  { key: 'G', label: 'CYCLE WEAPONS M/F', active: pressedKeys['g'] },
+                  { key: 'E', label: 'DEXTERITY INTERACT', active: pressedKeys['e'] },
+                  { key: 'Q', label: 'OSU BOOST SHIELD', active: pressedKeys['q'] },
+                  { key: 'X', label: 'TACTICAL RE-ARM', active: pressedKeys['x'] },
+                  { key: 'TAB', label: 'CONTROLLER SWAP', active: pressedKeys['tab'] },
+                ].map((caps) => (
+                  <div
+                    key={caps.key}
+                    className={`flex items-center justify-between border p-1 px-2 text-[8.5px] uppercase transition-all duration-300 ${
+                      caps.active
+                        ? "bg-amber-500/20 border-amber-400 text-amber-200 shadow-[0_0_8px_rgba(245,158,11,0.25)]"
+                        : "bg-black/40 border-zinc-900/60 text-zinc-500"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className={`px-1.5 py-0.5 font-bold border text-[8px] rounded-none ${
+                        caps.active ? "bg-amber-500 text-black font-black border-amber-300" : "bg-[#0b1219] border-zinc-800 text-zinc-405"
+                      }`}>
+                        {caps.key}
+                      </span>
+                      <span className="font-bold tracking-wider">{caps.label}</span>
+                    </div>
+                    <span className={`text-[7px] font-black ${caps.active ? "text-amber-400 animate-pulse" : "text-zinc-650"}`}>
+                      {caps.active ? "ENGAGED" : "STBY"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* CENTER COCKPIT - STAGE INSIGHT / FILE UPLOAD OR GLB CONTAINER */}
+          <div className="lg:col-span-6 flex flex-col gap-4">
+            <div 
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              className={`min-h-[400px] border-2 border-dashed relative flex flex-col items-center justify-center p-6 text-center select-none transition-all duration-300 overflow-hidden ${
+                isDragging 
+                  ? "border-amber-400 bg-amber-955/25" 
+                  : (activePreset || loadedModelName)
+                    ? "border-zinc-850 bg-[#020509]"
+                    : "border-zinc-800/80 bg-[#04080e]/95"
+              }`}
+            >
+              {/* Corner status markers */}
+              <div className="absolute top-2 left-2 text-[8px] font-bold text-zinc-650 uppercase tracking-widest bg-black/45 px-1.5 py-0.5 border border-zinc-900/60">
+                STG: 07 // {activePreset ? `${activePreset.toUpperCase()} ACTIVE` : loadedModelName ? "USER GLB" : "INITIAL_DISC"}
+              </div>
+              <div className="absolute top-2 right-2 text-[8.5px] font-mono text-amber-500 tracking-wider flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-ping" />
+                INTEGRATED CHG UNIT
+              </div>
+
+              {!(activePreset || loadedModelName) ? (
+                // Dashboard drop target, matching the image perfectly!
+                <div 
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex flex-col items-center justify-center max-w-sm cursor-pointer p-6 hover:bg-black/30 transition duration-300 pointer-events-auto"
+                >
+                  <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    onChange={handleFileChange} 
+                    accept=".glb" 
+                    className="hidden" 
+                  />
+                  {/* Glowing Arrow icon in line-styled modern layout */}
+                  <div className="w-14 h-14 rounded-full border border-zinc-800/80 flex items-center justify-center text-zinc-400 hover:text-white hover:border-amber-500/40 transition duration-300 bg-zinc-950/60 shadow-[0_0_15px_rgba(0,0,0,0.6)] mb-4">
+                    <span className="text-3xl font-black">↑</span>
+                  </div>
+
+                  <h2 className="text-sm font-black uppercase tracking-[0.2em] text-white">
+                    Drop operative.glb here
+                  </h2>
+                  <p className="text-[9px] font-semibold text-zinc-500 uppercase tracking-widest mt-1.5">
+                    or <span className="text-amber-500 underline underline-offset-4 hover:text-amber-400">click to browse</span>
+                  </p>
+
+                  <div className="mt-8 border-t border-zinc-900 pt-4 w-full">
+                    <span className="text-[7.5px] text-zinc-550 uppercase block tracking-widest mb-3 font-bold">SWITCH DIRECT INJECT PRESET MODEL</span>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActivePreset('cst-mvp');
+                          addLog("INSPECTOR TERMINAL // CHOSEN PRESET OPERATIVE: CST MVP GROUP 01");
+                        }}
+                        className="p-2 bg-[#020509]/95 hover:bg-zinc-950 border border-zinc-850 hover:border-zinc-700 text-zinc-400 text-[8.5px] font-black uppercase tracking-wider cursor-pointer transition-colors duration-200"
+                      >
+                        🧬 CST MVP GROUP 01
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActivePreset('forge');
+                          addLog("INSPECTOR TERMINAL // CHOSEN PRESET OPERATIVE: FORGE NET VIEWER");
+                        }}
+                        className="p-2 bg-[#020509]/95 hover:bg-zinc-950 border border-zinc-850 hover:border-zinc-700 text-zinc-400 text-[8.5px] font-black uppercase tracking-wider cursor-pointer transition-colors duration-200"
+                      >
+                        ⚙️ FORGE NET VIEWER
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                // 3D Babylon stage representation with scanner HUD
+                <div className="absolute inset-0 w-full h-full pointer-events-auto">
+                  <canvas ref={inspectionCanvasRef} className="absolute inset-0 w-full h-full outline-none block" />
+                  
+                  {/* Subtle 3D Grid Overlay Layer and Camera calibration readouts */}
+                  <div className="absolute bottom-3 left-3 bg-black/75 border border-zinc-900 p-2.5 text-[8px] flex flex-col gap-1 tracking-wider text-zinc-400 pointer-events-none">
+                    <div className="flex justify-between gap-4">
+                      <span>ANGLE MATRIX alpha:</span>
+                      <strong className="text-cyan-400 font-bold">45.00°</strong>
+                    </div>
+                    <div className="flex justify-between gap-4">
+                      <span>LIGHT POWER flux:</span>
+                      <strong className="text-amber-500 font-bold">144.50 LW</strong>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* RIGHT WING - ACTIONS & RIG CHASSIS CONTROLS */}
+          <div className="lg:col-span-3 flex flex-col gap-4">
+            <div className="p-4 bg-[#0a0f15]/95 border border-zinc-800 relative flex flex-col gap-3.5 min-h-[400px] shadow-[inset_0_1px_8px_rgba(0,0,0,0.8)]">
+              {/* Corner rivets */}
+              <div className="absolute top-1 left-1 w-1.5 h-1.5 rounded-full bg-zinc-700 pointer-events-none" />
+              <div className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-zinc-700 pointer-events-none" />
+              <div className="absolute bottom-1 right-1 w-1.5 h-1.5 rounded-full bg-zinc-700 pointer-events-none" />
+              <div className="absolute bottom-1 left-1 w-1.5 h-1.5 rounded-full bg-zinc-700 pointer-events-none" />
+
+              <div className="border-b border-zinc-800 pb-2 flex justify-between items-center">
+                <span className="text-[10px] font-black uppercase text-cyan-400 tracking-wider">// ACTIONS & CHASSIS RIG</span>
+                <span className="text-[7.5px] text-zinc-650 font-bold">SYS: ENERGIZED</span>
+              </div>
+
+              {/* Light Rig Controls */}
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[8px] font-black text-zinc-550 uppercase tracking-widest">// LIGHT CONFIGURATION RIG</span>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {[
+                    { id: 'flood', label: 'Flood Light' },
+                    { id: 'excitation', label: 'Chroma Light' },
+                    { id: 'lowglow', label: 'Low Shadows' },
+                  ].map((light) => (
+                    <button
+                      key={light.id}
+                      type="button"
+                      onClick={() => {
+                        setCurrentLightPreset(light.id as any);
+                        addLog(`RIG INTERACTION // LIGHT PRESET REGISTERED: [${light.label.toUpperCase()}]`);
+                      }}
+                      className={`p-1.5 text-[7.5px] font-bold uppercase border cursor-pointer transition-colors duration-150 ${
+                        currentLightPreset === light.id
+                          ? "bg-cyan-950/40 border-cyan-500/80 text-cyan-300"
+                          : "bg-black/50 border-zinc-900 text-zinc-550 hover:text-zinc-350"
+                      }`}
+                    >
+                      {light.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Camera Preset Positioners */}
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[8px] font-black text-zinc-550 uppercase tracking-widest">// CAMERA ALIGNMENT PORT</span>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {[
+                    { id: 'orbit', label: 'PERSPECT ORBIT' },
+                    { id: 'head', label: 'HEAD RECEPTOR' },
+                    { id: 'chassis', label: 'CHASSIS SHELL' },
+                    { id: 'bottom', label: 'BASE STACK' },
+                  ].map((cam) => (
+                    <button
+                      key={cam.id}
+                      type="button"
+                      onClick={() => {
+                        setCurrentCameraPreset(cam.id as any);
+                        addLog(`RIG INTERACTION // CAMERA AXIS SWUNG TO: [${cam.label}]`);
+                      }}
+                      className={`p-1.5 text-[7.5px] font-bold uppercase border cursor-pointer transition-colors duration-150 ${
+                        currentCameraPreset === cam.id
+                          ? "bg-cyan-950/40 border-cyan-500/80 text-cyan-300"
+                          : "bg-black/50 border-zinc-900 text-zinc-550 hover:text-zinc-350"
+                      }`}
+                    >
+                      {cam.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Drone Scan modes */}
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[8px] font-black text-zinc-550 uppercase tracking-widest">// AUTOMATED SCANNING DECK</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsDroneInspectOn(!isDroneInspectOn);
+                    addLog(`RIG INTERACTION // SWEEP LASER OVERLAY: [${!isDroneInspectOn ? "ENGAGED" : "HALTED"}]`);
+                  }}
+                  className={`w-full p-2 text-[8px] font-black uppercase border cursor-pointer transition-colors duration-155 ${
+                    isDroneInspectOn
+                      ? "bg-teal-905/30 border-teal-500 text-teal-300 shadow-[inset_0_1px_8px_rgba(20,184,166,0.15)] font-black"
+                      : "bg-black/55 border-zinc-900 text-zinc-550 hover:text-zinc-300"
+                  }`}
+                >
+                  📡 {isDroneInspectOn ? "DRONE INSPECT [ACTIVE]" : "DRONE INSPECT [IDLE]"}
+                </button>
+              </div>
+
+              {/* Return or load new anchors */}
+              <div className="mt-auto border-t border-zinc-900 pt-3 flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActivePreset(null);
+                    setLoadedModelName(null);
+                    (window as any).__lastUploadedGlbFile = null;
+                    addLog("INSPECTOR TERMINAL // CHASSIS CONSTRUCTIONS DISCHARGED");
+                  }}
+                  disabled={!(activePreset || loadedModelName)}
+                  className={`w-full py-2.5 text-[8.5px] font-black uppercase tracking-wider border cursor-pointer transition-all duration-300 ${
+                    (activePreset || loadedModelName)
+                      ? "bg-amber-955/30 border-amber-600/60 text-amber-200 hover:bg-amber-955/50 hover:border-amber-500"
+                      : "bg-zinc-950/20 border-zinc-900 text-zinc-700 cursor-not-allowed"
+                  }`}
+                >
+                  🧬 CHOOSE DIFFERENT UNIT
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveDeskTab('hologram');
+                    addLog("MTD COCKPIT // REDIRECTED TO COCKPIT HOVER BRIDGE ASSEMBLY");
+                  }}
+                  className="w-full py-2.5 bg-[#0e1620] hover:bg-[#142030] border border-cyan-800/40 hover:border-cyan-500/60 text-cyan-300 text-[8.5px] font-black uppercase tracking-widest cursor-pointer transition-colors duration-200"
+                >
+                  ⚙️ RETURN TO BRIDGE SYSTEM
+                </button>
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+      )}
 
       {/* ================= STRIPE CHECKOUT MODAL OVERLAY ================= */}
       <AnimatePresence>
@@ -1946,6 +3424,219 @@ export const RepairBay3D: React.FC<Props> = ({
                   )}
                 </button>
               </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ================= COAXIAL LANCE CONSTRUCT FORGE POP-UP ================= */}
+      <AnimatePresence>
+        {isLanceModalOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-40 bg-black/92 backdrop-blur-md flex items-center justify-center p-4 select-none font-sans"
+          >
+            <motion.div 
+              initial={{ scale: 0.94, y: 15 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.94, y: 15 }}
+              className="w-full max-w-lg bg-[#04080c] border-2 border-amber-500/40 p-4 rounded-none shadow-[0_0_50px_rgba(245,158,11,0.22)] flex flex-col gap-3 relative max-h-[96%] overflow-y-auto"
+            >
+              {/* Corner brackets */}
+              <div className="absolute top-1 left-1 w-2.5 h-2.5 border-t border-l border-amber-500/50 pointer-events-none" />
+              <div className="absolute top-1 right-1 w-2.5 h-2.5 border-t border-r border-amber-500/50 pointer-events-none" />
+              <div className="absolute bottom-1 left-1 w-2.5 h-2.5 border-b border-l border-amber-500/50 pointer-events-none" />
+              <div className="absolute bottom-1 right-1 w-2.5 h-2.5 border-b border-r border-amber-500/50 pointer-events-none" />
+
+              {/* Modal Header */}
+              <div className="flex justify-between items-center pb-2 border-b border-zinc-850">
+                <div className="flex items-center gap-2">
+                  <Flame className="w-4 h-4 text-amber-500 animate-pulse" />
+                  <div>
+                    <span className="font-mono text-[9.5px] font-black uppercase text-amber-400 tracking-widest block leading-none">
+                      COAXIAL LANCE CONSTRUCT FORGE
+                    </span>
+                    <span className="text-[6px] font-mono text-zinc-500 uppercase tracking-widest block mt-0.5">
+                      DECI-DIEGETIC WEAPON MANUFACTORY // PILOT INTEGRATION
+                    </span>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setIsLanceModalOpen(false)}
+                  className="w-5 h-5 flex items-center justify-center text-zinc-500 hover:text-white hover:bg-zinc-900 border border-zinc-850 cursor-pointer font-mono text-[9px]"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Status Banner */}
+              <div className="bg-amber-950/15 border border-amber-500/15 p-2 rounded-none flex items-center justify-between">
+                <div className="flex items-center gap-1.5 font-mono text-[8px]">
+                  <span className={`w-1.5 h-1.5 rounded-full ${isLanceBuilt ? "bg-amber-400 animate-ping" : "bg-zinc-700"}`} />
+                  <span className="font-bold text-amber-300 uppercase">
+                    Status: {isLanceBuilt ? "CONSTRUCT INTEGRATED" : "BLUEPRINT STANDBY"}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsLanceBuilt(!isLanceBuilt)}
+                  className={`px-2 py-0.5 font-mono text-[7px] uppercase font-black tracking-widest cursor-pointer transition-colors ${
+                    isLanceBuilt 
+                      ? "bg-red-950/40 hover:bg-red-950/60 border border-red-500/40 text-red-300"
+                      : "bg-amber-500 hover:bg-amber-400 text-black border border-transparent"
+                  }`}
+                >
+                  {isLanceBuilt ? "✖ DISMANTLE" : "⚡ ASSEMBLE"}
+                </button>
+              </div>
+
+              {/* Customizer workspace */}
+              {isLanceBuilt ? (
+                <div className="flex flex-col gap-3">
+                  
+                  {/* Position mode selector */}
+                  <div className="flex flex-col gap-1">
+                    <label className="text-zinc-400 font-mono text-[7.5px] uppercase font-bold tracking-wider">
+                      Position Alignment Anchor
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => setLancePositionMode('train')}
+                        className={`py-1.5 font-mono text-[7.5px] font-bold uppercase tracking-widest border transition-all ${
+                          lancePositionMode === 'train' 
+                            ? "bg-amber-500/10 border-amber-500 text-amber-300 shadow-[0_0_8px_rgba(245,158,11,0.1)]"
+                            : "bg-zinc-950 border-zinc-850 text-zinc-500 hover:text-zinc-300 hover:border-zinc-700"
+                        }`}
+                      >
+                        Parent onto Train
+                      </button>
+                      <button
+                        onClick={() => setLancePositionMode('dock')}
+                        className={`py-1.5 font-mono text-[7.5px] font-bold uppercase tracking-widest border transition-all ${
+                          lancePositionMode === 'dock' 
+                            ? "bg-amber-500/10 border-amber-500 text-amber-300 shadow-[0_0_8px_rgba(245,158,11,0.1)]"
+                            : "bg-zinc-950 border-zinc-850 text-zinc-500 hover:text-zinc-300 hover:border-zinc-700"
+                        }`}
+                      >
+                        Float In Central Dock
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Iron needle length slider */}
+                  <div className="flex flex-col gap-1">
+                    <div className="flex justify-between font-mono text-[7.5px] uppercase font-bold tracking-wider text-zinc-400">
+                      <span>Iron Needle Length</span>
+                      <span className="text-amber-400">{lanceTipLength.toFixed(2)}m</span>
+                    </div>
+                    <input 
+                      type="range"
+                      min="0.3"
+                      max="1.6"
+                      step="0.05"
+                      value={lanceTipLength}
+                      onChange={(e) => setLanceTipLength(parseFloat(e.target.value))}
+                      className="w-full h-1 bg-zinc-950 accent-amber-500 cursor-pointer"
+                    />
+                  </div>
+
+                  {/* Glow color selector */}
+                  <div className="flex flex-col gap-1">
+                    <label className="text-zinc-400 font-mono text-[7.5px] uppercase font-bold tracking-wider">
+                      Core Glow Color Theme
+                    </label>
+                    <div className="flex items-center gap-1.5">
+                      {[
+                        { name: 'cyan', color: '#06b6d4' },
+                        { name: 'amber', color: '#f59e0b' },
+                        { name: 'emerald', color: '#10b981' },
+                        { name: 'violet', color: '#a855f7' },
+                        { name: 'crimson', color: '#ef4444' },
+                      ].map(item => (
+                        <button
+                          key={item.color}
+                          onClick={() => setLanceGlowColor(item.color)}
+                          style={{ borderColor: lanceGlowColor === item.color ? item.color : 'transparent' }}
+                          className="flex-1 py-1 rounded-sm border hover:scale-105 active:scale-95 transition-all text-[6.5px] font-mono text-center block bg-zinc-950"
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full inline-block mr-1 align-middle animate-pulse" style={{ backgroundColor: item.color }} />
+                          <span className="text-zinc-400 align-middle">{item.name.toUpperCase()}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Ring Count and Expansion multipliers */}
+                  <div className="grid grid-cols-2 gap-3 mt-0.5">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-zinc-400 font-mono text-[7.5px] uppercase font-bold">Convergence Rings</label>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => setLanceRingCount(prev => Math.max(0, prev - 1))}
+                          className="w-5 h-5 border border-zinc-850 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-900 font-bold"
+                        >
+                          -
+                        </button>
+                        <span className="flex-1 font-mono text-center text-amber-400 text-[9px] font-bold">{lanceRingCount}</span>
+                        <button
+                          onClick={() => setLanceRingCount(prev => Math.min(5, prev + 1))}
+                          className="w-5 h-5 border border-zinc-850 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-900 font-bold"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                      <div className="flex justify-between font-mono text-[7.5px] uppercase font-bold text-zinc-400">
+                        <span>Magnetic Gap</span>
+                        <span className="text-amber-400">{lanceExpansion.toFixed(1)}x</span>
+                      </div>
+                      <input 
+                        type="range"
+                        min="0.5"
+                        max="2.5"
+                        step="0.1"
+                        value={lanceExpansion}
+                        onChange={(e) => setLanceExpansion(parseFloat(e.target.value))}
+                        className="w-full h-4 bg-transparent accent-amber-500 cursor-pointer"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Dynamic Power Alignment gauge */}
+                  <div className="flex flex-col gap-1 border-t border-zinc-850/60 pt-2">
+                    <div className="flex justify-between text-[6.5px] font-mono uppercase tracking-widest text-[#a855f7] leading-none mb-1 font-bold">
+                      <span>Plasma Power Calibration</span>
+                      <span>Level: {lancePowerLevel}%</span>
+                    </div>
+                    <div className="w-full h-1 bg-zinc-950/80 rounded-none overflow-hidden relative border border-zinc-850">
+                      <div className="absolute h-full bg-[#a855f7]" style={{ width: `${lancePowerLevel}%` }} />
+                    </div>
+                  </div>
+
+                </div>
+              ) : (
+                <div className="py-6 flex flex-col items-center justify-center text-center gap-2 border border-dashed border-zinc-850 p-4">
+                  <Database className="w-6 h-6 text-zinc-700 animate-pulse" />
+                  <div>
+                    <span className="font-mono text-[8px] font-bold text-zinc-400 uppercase block">NO ACTIVE SPECIFICATIONS DETECTED</span>
+                    <span className="font-mono text-[6px] text-zinc-500 block max-w-sm mt-1 leading-normal">
+                      Click Assemble above to manifest the modular Lance within the local digital calibration space. Once constructed, you are free to customize its geometric vectors in real-time.
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Close controls */}
+              <button
+                onClick={() => setIsLanceModalOpen(false)}
+                className="mt-1 w-full py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-mono text-[8px] font-black uppercase tracking-widest rounded-none shadow flex items-center justify-center gap-1.5"
+              >
+                <span>Commit & Close Forge Controls</span>
+              </button>
             </motion.div>
           </motion.div>
         )}

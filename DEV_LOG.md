@@ -160,6 +160,47 @@ This operational log chronicles development cycles, feature pipelines, telemetry
 3. **Smooth State-Machine Transitions**
    - **Chassis Lock**: Configured a global `currentScreen` state inside `App.tsx` matching parent layout nodes. Activating the "Enter the Console" HUD triggers a synchronized fade-and-scale exit animation using `AnimatePresence` and framer-motion, booting the primary holographic terminal environment seamlessly.
 
+---
+
+## [CYCLE 15 - FRAMER MOTION PORTAL-WARP TRANSITION] - 2026-06-16
+
+### Summary of Implementations
+1. **Interactive Cosmic Warp-Portal Exit/Enter Transition**
+   - **Mechanism**: Wrapped the primary holographic rendering layer of `<AugmentedCanvas>` in `<AnimatePresence mode="popLayout">`, keyed dynamically using the relic's core binary buffer hash and the active spectral signal variant (`image.base64 + activeVariant`).
+   - **Portal Fluid Dynamics**: Formulated custom transitions (`warpVariants`) modeling real spacetime singularity geometry. As a new relic signal is locked, the incoming layer emerges from an ultra-compact singularity point (`scale: 0.1`, highly spun `rotate: -180`, hyper-saturated `brightness(4)`, with standard spherical radial `borderRadius: '100%'`), expanding out smoothly via a spring tension curve.
+   - **Dissolving Out**: Outbound signals accelerate rapidly outwards (`scale: 2.5`, `rotate: 180`, fading black brightness) with a high-drag border sweep to avoid jarring asset pop-ins.
+2. **Dual-Layer Coaxial Vortex Overlay**
+   - **Holographic Ring Projection**: Synchronized a secondary procedural SVG portal vortex with structural speed lines and rotating energy arrays that tracks the lifetime of active warp phases in perfect lockstep with the primary asset.
+   - **Dynamic Chromic Tuning**: Tuning the active variant dynamically alters the portal's radial gradients and line-arcs to match the target's frequency signature (e.g., icy cyan for the Abyss, violet/amber for Chronos, and golden rose for Aether).
+3. **Symmetric Wet-Surface Water Reflection Warping**
+   - **Sub-surface Ripple Synced warp**: Bound the wet-surface reflection layer to the exact same Framer Motion warp pipeline, forcing the flipped, blurred water reflection to warp in synchronous harmony with the active relic signal, achieving exceptional cinematic and perspective realism.
+
+---
+
+## [CYCLE 16 - FORMATTED MYTHIC LORE SHARE INTERFACE] - 2026-06-17
+
+### Summary of Implementations
+1. **Mythic Lore Plain-Text Formatting Generator**
+   - **Structured Layout Transformation**: Implemented a core generator `generateCleanLoreText` that maps active `<oracleIntel>` metadata points (Designation, Class, Rarity, Origin, Hash ID) into an elegant, custom cyber-industrial framing board.
+   - **Markdown Purification**: Configured regular expression pipelines that strip raw markdown headings (`###`, `##`), purge emphasis decorators (`**`), and standardize bullet patterns into uniform indents, outputting a gorgeous plain-text document ideal for clipboard sharing and cross-platform reading.
+2. **Coaxial Share-or-Copy Dispatcher**
+   - **Web Share Fallback Pipeline**: Built `handleShareLore` targeting standard mobile `navigator.share` channels. On compatible systems, this triggers native platform sharing panels seamlessly; on standard workstations, it falls back to secure clipboard copying, complete with an interactive system console trace log.
+   - **Visual Success Loops**: Tailored a custom reactive button state `<Share2>` with animated spring bounces and temporary green terminal highlights (`LORE COPIED!`) to confirm completion.
+
+---
+
+## [CYCLE 17 - D3 RARITY DISTRIBUTION WIDGET] - 2026-06-17
+
+### Summary of Implementations
+1. **Interactive D3 Rarity Grade Distribution Chart**
+   - **Mechanism**: Engineered a custom D3-scaled SVG bar chart component (`<RarityDistributionChart>`) that aggregates, groups, and maps the frequency distribution of all 8 canonical rarity levels across the user's active `intelHistory` array.
+   - **D3 Linear & Band Scale Integration**: Implemented pure `d3.scaleLinear` for dynamic bar widths mapping to maximum counts, paired with `d3.scaleBand` to determine tight band positioning on the vertical axis with pixel-perfect responsive scaling.
+2. **Cyber-Industrial UI Framing & Statistics Readout**
+   - **HUD Monitor Tab Mount**: Mounted the widget seamlessly beneath the Variant Forge radar chart in the primary "Monitor Nodes" sidebar. 
+   - **Diagnostic telemetry feed**: Configured dynamic statistics dashboards that calculate total scanning integrity and point-by-point counts. Hovering over any specific bar triggers a real-time reactive log event detailing that specific grade's deep classification.
+3. **Empty State & Fail-Safe Graphics**
+   - **Archival Placeholder**: Built a stylized glowing retro-warning empty state rendering when no active records exist in the local terminal database, directing the operator back to the scanning frequency channels.
+
 
 
 

@@ -17,12 +17,13 @@ import { OriginMiniMap } from './components/OriginMiniMap';
 import { AudioVisualizer } from './components/AudioVisualizer';
 import { LoreNetworkGraph } from './components/LoreNetworkGraph';
 import { HeroLandingPage } from './components/HeroLandingPage';
+import { RarityDistributionChart } from './components/RarityDistributionChart';
 import { 
   Upload, Sparkles, RefreshCw, Sliders, ChevronRight, Zap, 
   Terminal, ShieldCheck, Eye, EyeOff, Radio, HelpCircle, 
   Download, ShoppingBag, Database, Cpu, ExternalLink, X, FileJson, FileImage, Layers,
   Search, Trash2, History, BookOpen, AlertTriangle, GitCompare, Maximize2, Minimize2, Grid, Box, Magnet,
-  Volume2, VolumeX, Flame, Network
+  Volume2, VolumeX, Flame, Network, Share2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -540,6 +541,8 @@ function App() {
   } | null>(null);
 
   const [oracleIntel, setOracleIntel] = useState<OracleIntel | null>(null);
+  const [isAnomalousEventActive, setIsAnomalousEventActive] = useState<boolean>(false);
+  const [isCoaxialBurstActive, setIsCoaxialBurstActive] = useState<boolean>(false);
   const [isMuted, setIsMuted] = useState<boolean>(() => {
     try {
       const saved = localStorage.getItem('oracle_audio_muted');
@@ -565,6 +568,7 @@ function App() {
   const [isLoreModalOpen, setIsLoreModalOpen] = useState<boolean>(false);
   const [decodedLoreContent, setDecodedLoreContent] = useState<string>('');
   const [isDecodingLoreRunning, setIsDecodingLoreRunning] = useState<boolean>(false);
+  const [isShareCopied, setIsShareCopied] = useState<boolean>(false);
 
   // Lore Dictionary states
   const [isLoreDictOpen, setIsLoreDictOpen] = useState<boolean>(false);
@@ -677,6 +681,73 @@ Failed to decode the deep archive. Please verify that your system authentication
     addLog(`ORACLE ARCHIVE LOG PURGED [${oracleId}]`);
   };
 
+  const generateCleanLoreText = () => {
+    if (!oracleIntel) return "";
+    
+    // Clean markdown notations from decodedLoreContent
+    let cleanedContent = decodedLoreContent
+      // Remove ### headings but keep text capitalized and spaced
+      .replace(/^###\s*(.*)$/gm, '\n=== $1 ===\n')
+      // Remove ## headings but keep text capitalized and spaced
+      .replace(/^##\s*(.*)$/gm, '\n=== $1 ===\n')
+      // Remove bold markers
+      .replace(/\*\*/g, '')
+      // Remove bullet points but keep a clean index indentation
+      .replace(/^[-*]\s*/gm, ' • ')
+      .trim();
+
+    const border = "==================================================";
+    const divider = "--------------------------------------------------";
+    
+    return `${border}
+🌌 ABYSSUM SYSTEMS - DECRYPTED MYTHIC LORE 🌌
+${border}
+IDENTIFIER  : ${oracleIntel.oracleId || "N/A"}
+DESIGNATION : ${oracleIntel.name.toUpperCase()}
+CLASS       : ${oracleIntel.class.toUpperCase()}
+RARITY      : ${oracleIntel.rarity.toUpperCase()}
+ORIGIN      : ${oracleIntel.origin.toUpperCase()}
+SIG HASH    : ${oracleIntel.hash || "N/A"}
+${divider}
+
+${cleanedContent}
+
+${border}
+COGNITIVE DECRYPTION FEED LINK SECURED
+${border}`;
+  };
+
+  const handleShareLore = async () => {
+    const text = generateCleanLoreText();
+    if (!text) return;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `Decrypted Mythic Lore: ${oracleIntel?.name}`,
+          text: text
+        });
+        addLog(`DECRYPTOR SYSTEM // LORE SCHEMATICS SHARED SUCCESSFULLY`);
+        return;
+      } catch (err) {
+        // User cancelled or share failed, fallback to clipboard
+        console.log("Navigator.share failed/cancelled, falling back to clipboard", err);
+      }
+    }
+
+    // Fallback to clipboard
+    try {
+      await navigator.clipboard.writeText(text);
+      setIsShareCopied(true);
+      addLog(`DECRYPTOR SYSTEM // EXPORTED CLEAN SHARABLE LORE TO CLIPBOARD`);
+      setTimeout(() => {
+        setIsShareCopied(false);
+      }, 2000);
+    } catch (err) {
+      console.error("Clipboard copy failed: ", err);
+    }
+  };
+
   const clearIntelHistory = () => {
     setIntelHistory([]);
     try {
@@ -721,11 +792,14 @@ Failed to decode the deep archive. Please verify that your system authentication
   // Automatically append high-priority telemetry entries for Anomalous Mythic Events
   useEffect(() => {
     if (oracleIntel && oracleIntel.rarity.toUpperCase().includes('MYTHIC')) {
+      setIsAnomalousEventActive(true);
       const id = oracleIntel.oracleId;
       if (!loggedAnomaliesRef.current.has(id)) {
         loggedAnomaliesRef.current.add(id);
         addLog(`⚠️ [HIGH-PRIORITY ALERT] // MYTHIC ANOMALOUS DETECTED [ID: ${id}] // INSTABILITY DETUNING FEED FOR "${oracleIntel.name.toUpperCase()}"`);
       }
+    } else {
+      setIsAnomalousEventActive(false);
     }
   }, [oracleIntel]);
 
@@ -1586,6 +1660,111 @@ METADATA SIGNATURE ASSIGNED // ARCHIVIST HUB CONSOLE`;
     }
   };
 
+  const playRiftSoundEffect = () => {
+    if (isMuted) return;
+    try {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioContextClass) return;
+      
+      const ctx = new AudioContextClass();
+      if (ctx.state === "suspended") {
+        ctx.resume();
+      }
+      
+      const duration = 1.8;
+      const now = ctx.currentTime;
+      
+      // Carrier frequency: space tearing swoop
+      const carrier = ctx.createOscillator();
+      carrier.type = "sawtooth";
+      carrier.frequency.setValueAtTime(650, now);
+      carrier.frequency.exponentialRampToValueAtTime(75, now + 0.45);
+      carrier.frequency.linearRampToValueAtTime(130, now + 1.2);
+      
+      // Modulator for frequency modulation (FM) to create metallic tear
+      const modulator = ctx.createOscillator();
+      modulator.type = "sine";
+      modulator.frequency.setValueAtTime(260, now);
+      modulator.frequency.exponentialRampToValueAtTime(920, now + 0.65);
+      
+      const modulatorGain = ctx.createGain();
+      modulatorGain.gain.setValueAtTime(110, now);
+      modulatorGain.gain.exponentialRampToValueAtTime(12, now + 1.25);
+      
+      // Sub base boom layer for rift stability
+      const resonanceBase = ctx.createOscillator();
+      resonanceBase.type = "triangle";
+      resonanceBase.frequency.setValueAtTime(42, now);
+      resonanceBase.frequency.linearRampToValueAtTime(28, now + 1.8);
+      
+      // Filter for rift sweeping
+      const filter = ctx.createBiquadFilter();
+      filter.type = "bandpass";
+      filter.frequency.setValueAtTime(2400, now);
+      filter.frequency.exponentialRampToValueAtTime(220, now + 0.95);
+      filter.Q.setValueAtTime(9, now);
+      
+      const lowpass = ctx.createBiquadFilter();
+      lowpass.type = "lowpass";
+      lowpass.frequency.setValueAtTime(450, now);
+      
+      const masterGain = ctx.createGain();
+      masterGain.gain.setValueAtTime(0.001, now);
+      masterGain.gain.linearRampToValueAtTime(0.38, now + 0.08);
+      masterGain.gain.exponentialRampToValueAtTime(0.14, now + 0.85);
+      masterGain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+      
+      const baseGain = ctx.createGain();
+      baseGain.gain.setValueAtTime(0.001, now);
+      baseGain.gain.linearRampToValueAtTime(0.42, now + 0.1);
+      baseGain.gain.exponentialRampToValueAtTime(0.001, now + 1.7);
+      
+      // Connect FM synthesis
+      modulator.connect(modulatorGain);
+      modulatorGain.connect(carrier.frequency);
+      
+      // Wire main tear
+      carrier.connect(filter);
+      filter.connect(masterGain);
+      
+      // Wire base rumble
+      resonanceBase.connect(lowpass);
+      lowpass.connect(baseGain);
+      baseGain.connect(ctx.destination);
+      
+      // Connect tear to output
+      masterGain.connect(ctx.destination);
+      
+      // Start/Stop
+      carrier.start(now);
+      modulator.start(now);
+      resonanceBase.start(now);
+      
+      carrier.stop(now + duration + 0.1);
+      modulator.stop(now + duration + 0.1);
+      resonanceBase.stop(now + duration + 0.1);
+    } catch (e) {
+      console.warn("Audio Context error on rift burst:", e);
+    }
+  };
+
+  const triggerCoaxialBurst = () => {
+    if (isCoaxialBurstActive) return;
+    setIsCoaxialBurstActive(true);
+    addLog("⚡ COAXIAL FIELD INJECTED // HIGH-FREQUENCY COAXIAL BURST RUNNING");
+    
+    playRiftSoundEffect();
+    
+    // Temporarily increase deep visual jitter we set isGlitching
+    setIsGlitching(true);
+    
+    setTimeout(() => {
+      setIsCoaxialBurstActive(false);
+      setIsGlitching(false);
+      addLog("✔ COAXIAL FIELD DISSIPATED // TEMPORAL RIFT BALANCED");
+    }, 1800);
+  };
+
   const triggerPulse = () => {
     if (!data) return;
     setIsPlayingPulse(true);
@@ -1651,6 +1830,41 @@ METADATA SIGNATURE ASSIGNED // ARCHIVIST HUB CONSOLE`;
       default:
         return { clarity: "90%", depth: "10 λ", mythic: "9.0/10" };
     }
+  };
+
+  // Define helper to get proportional rarity score and speed settings for heartbeat
+  const getRarityScoreAndSettings = (rarityStr?: string) => {
+    if (!rarityStr) return { score: 10, duration: 2.2, bpm: 27, hz: 0.45 };
+    
+    const r = rarityStr.toUpperCase();
+    let score = 20;
+
+    if (r.includes('MYTHIC')) {
+      score = 100;
+    } else if (r.includes('OMEGA') || r.includes('NON-EUCLIDEAN') || r.includes('ASTRAL')) {
+      score = 90;
+    } else if (r.includes('FORBIDDEN') || r.includes('ARCHETYPE')) {
+      score = 80;
+    } else if (r.includes('S-GRADE')) {
+      score = 70;
+    } else if (r.includes('PARADOXICAL') || r.includes('COSMIC')) {
+      score = 60;
+    } else if (r.includes('PRIMORDIAL')) {
+      score = 50;
+    } else if (r.includes('SOVEREIGN')) {
+      score = 40;
+    } else if (r.includes('LEGENDARY') || r.includes('ANOMALOUS')) {
+      score = 30;
+    }
+
+    // Proportional formula: duration decreases linearly down to 0.35s at score 100
+    // At score 10 (or idle helper), duration is 2.2s
+    // At score 100, duration is Math.max(0.35, 2.2 - (score / 100) * 1.85) = 0.35s
+    const duration = Math.max(0.35, 2.2 - (score / 100) * 1.85);
+    const bpm = Math.round(60 / duration);
+    const hz = parseFloat((1 / duration).toFixed(2));
+
+    return { score, duration, bpm, hz };
   };
 
   return (
@@ -1733,20 +1947,90 @@ METADATA SIGNATURE ASSIGNED // ARCHIVIST HUB CONSOLE`;
         <header className="flex-none flex flex-col md:flex-row justify-between items-start md:items-center border-b border-white/10 pb-4 mb-4 gap-3">
           <div className="flex items-center gap-3">
             {/* Oracle Signal High-Tech Abstract Logo */}
-            <div className="relative group shrink-0">
-              <div className="absolute -inset-1 rounded-full bg-gradient-to-r from-purple-500 via-cyan-500 to-indigo-500 opacity-60 blur-sm group-hover:opacity-100 transition-opacity duration-300 animate-pulse" />
-              <div className="relative w-11 h-11 rounded-full overflow-hidden bg-black border border-purple-500/50 flex items-center justify-center shadow-[0_0_12px_rgba(168,85,247,0.3)]">
+            <motion.div 
+              className="relative group shrink-0 cursor-pointer"
+              animate={{
+                scale: [1, 1.06 + (getRarityScoreAndSettings(oracleIntel?.rarity).score / 100) * 0.08, 0.98, 1.08 + (getRarityScoreAndSettings(oracleIntel?.rarity).score / 100) * 0.1, 1],
+                filter: isAnomalousEventActive ? [
+                  "drop-shadow(0 0 4px rgba(239,68,68,0.25))",
+                  "drop-shadow(0 0 20px rgba(239,68,68,0.9))",
+                  "drop-shadow(0 0 6px rgba(239,68,68,0.4))",
+                  "drop-shadow(0 0 28px rgba(239,68,68,1.0))",
+                  "drop-shadow(0 0 4px rgba(239,68,68,0.25))"
+                ] : oracleIntel ? [
+                  "drop-shadow(0 0 3px rgba(6,182,212,0.2))",
+                  "drop-shadow(0 0 14px rgba(6,182,212,0.7))",
+                  "drop-shadow(0 0 5px rgba(168,85,247,0.3))",
+                  "drop-shadow(0 0 18px rgba(168,85,247,0.85))",
+                  "drop-shadow(0 0 3px rgba(6,182,212,0.2))"
+                ] : [
+                  "drop-shadow(0 0 3px rgba(168,85,247,0.15))",
+                  "drop-shadow(0 0 8px rgba(168,85,247,0.4))",
+                  "drop-shadow(0 0 4px rgba(99,102,241,0.2))",
+                  "drop-shadow(0 0 10px rgba(99,102,241,0.5))",
+                  "drop-shadow(0 0 3px rgba(168,85,247,0.15))"
+                ]
+              }}
+              transition={{
+                duration: getRarityScoreAndSettings(oracleIntel?.rarity).duration,
+                repeat: Infinity,
+                ease: "easeInOut",
+                times: [0, 0.15, 0.28, 0.45, 1]
+              }}
+              onClick={() => {
+                if (oracleIntel) {
+                  const element = document.getElementById('anomalous-event-card') || document.getElementById('intel-details-panel');
+                  if (element) {
+                    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    addLog("🎯 LOGO QUICKNAV // REDIRECTING TO ANALYTICAL VIEWPORT");
+                  }
+                }
+              }}
+            >
+              {/* Pulsing backdrop ring of light */}
+              <motion.div 
+                className={`absolute -inset-1 rounded-full bg-gradient-to-r filter blur-sm group-hover:opacity-100 transition-opacity duration-500 ${
+                  isAnomalousEventActive 
+                    ? "from-red-600 via-rose-500 to-amber-500 opacity-95 shadow-[0_0_20px_rgba(239,68,68,0.5)]" 
+                    : oracleIntel
+                      ? "from-cyan-500 via-purple-500 to-indigo-500 opacity-80"
+                      : "from-purple-600/60 via-cyan-500/50 to-indigo-600/60 opacity-50"
+                }`}
+                animate={{
+                  opacity: isAnomalousEventActive ? [0.8, 1, 0.8, 1, 0.8] : oracleIntel ? [0.6, 0.9, 0.6, 0.9, 0.6] : [0.4, 0.6, 0.4, 0.6, 0.4],
+                  scale: isAnomalousEventActive ? [1, 1.25, 1.05, 1.32, 1] : oracleIntel ? [1, 1.15, 1.02, 1.2, 1] : [1, 1.08, 1.0, 1.12, 1]
+                }}
+                transition={{
+                  duration: getRarityScoreAndSettings(oracleIntel?.rarity).duration,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                  times: [0, 0.15, 0.28, 0.45, 1]
+                }}
+              />
+              <div className={`relative w-11 h-11 rounded-full overflow-hidden bg-black flex items-center justify-center transition-all duration-300 ${
+                isAnomalousEventActive 
+                  ? "border-2 border-red-500 shadow-[0_0_12px_rgba(244,63,94,0.4)]" 
+                  : oracleIntel
+                    ? "border-2 border-cyan-500/50 shadow-[0_0_12px_rgba(6,182,212,0.3)]"
+                    : "border border-purple-500/50 shadow-[0_0_12px_rgba(168,85,247,0.3)]"
+              }`}>
                 <img 
                   src="/src/assets/images/oracle_signal_logo_1781038362760.png" 
                   alt="Oracle Signal Logo" 
-                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                  className={`w-full h-full object-cover transition-transform duration-500 ${
+                    oracleIntel ? "scale-105 saturate-125 brightness-110" : "group-hover:scale-110"
+                  }`}
                   referrerPolicy="no-referrer"
                 />
               </div>
-              {/* Micro tech overlay indicators */}
-              <div className="absolute top-0 right-0 w-2 h-2 rounded-full bg-cyan-400 border border-black animate-ping" />
-              <div className="absolute top-0 right-0 w-2 h-2 rounded-full bg-cyan-400 border border-black" />
-            </div>
+              {/* Micro tech overlay indicators with anomalous threat reactivity */}
+              <div className={`absolute top-0 right-0 w-2 h-2 rounded-full border border-black animate-ping transition-colors duration-300 ${
+                isAnomalousEventActive ? "bg-red-500" : oracleIntel ? "bg-cyan-400" : "bg-purple-500"
+              }`} />
+              <div className={`absolute top-0 right-0 w-2 h-2 rounded-full border border-black transition-colors duration-300 ${
+                isAnomalousEventActive ? "bg-red-500 shadow-[0_0_6px_#ef4444]" : oracleIntel ? "bg-cyan-400 shadow-[0_0_4px_#22d3ee]" : "bg-purple-500"
+              }`} />
+            </motion.div>
 
             <div className="flex flex-col">
               <div className="flex items-center gap-2">
@@ -1775,6 +2059,17 @@ METADATA SIGNATURE ASSIGNED // ARCHIVIST HUB CONSOLE`;
                 <span className="text-[10px] text-zinc-500 font-mono font-semibold tracking-wider">
                   {isAwakened ? 'Guardian Protocol Online' : 'Cine-Reel Mode Enabled'}
                 </span>
+                {oracleIntel && (
+                  <>
+                    <span className="text-zinc-650 font-mono text-[9px]">•</span>
+                    <span className="text-[10px] text-zinc-500 font-mono font-semibold tracking-wider flex items-center gap-1">
+                      HEARTBEAT:
+                      <span className={`${isAnomalousEventActive ? "text-red-400 glow-red animate-ping" : "text-brand-cyan glow-cyan"} uppercase font-bold`}>
+                        {getRarityScoreAndSettings(oracleIntel.rarity).bpm} BPM ({getRarityScoreAndSettings(oracleIntel.rarity).hz} Hz)
+                      </span>
+                    </span>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -2306,6 +2601,20 @@ METADATA SIGNATURE ASSIGNED // ARCHIVIST HUB CONSOLE`;
                 {isPlayingPulse ? "PULSING RELIC..." : "AWAITING VEO-3 PULSE"}
               </button>
 
+              {/* High-Frequency Coaxial Burst Button */}
+              <button 
+                onClick={triggerCoaxialBurst}
+                disabled={isCoaxialBurstActive || !data}
+                className={`mt-2.5 w-full py-2.5 border text-xs font-mono font-bold uppercase tracking-[0.15em] rounded-lg transition-all duration-300 active:scale-95 disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center gap-2 cursor-pointer ${
+                  isCoaxialBurstActive 
+                    ? "bg-rose-950/45 border-rose-500 text-rose-300 shadow-[0_0_15px_rgba(244,63,94,0.35)] animate-pulse" 
+                    : "bg-black/60 hover:bg-rose-950/20 border-zinc-800 hover:border-rose-500/50 text-zinc-400 hover:text-rose-300"
+                }`}
+              >
+                <Flame size={13} className={isCoaxialBurstActive ? "animate-bounce text-rose-450" : "text-zinc-550 group-hover:text-rose-400"} />
+                {isCoaxialBurstActive ? "COAXIAL BURST RUNNING..." : "HIGH-FREQUENCY COAXIAL BURST"}
+              </button>
+
               {/* Real-time Audio Waveform Spectral Oscilloscope */}
               <AudioVisualizer analyserNode={analyserNode} motionIntensity={motionIntensity} isAwakened={isAwakened} />
 
@@ -2532,6 +2841,7 @@ METADATA SIGNATURE ASSIGNED // ARCHIVIST HUB CONSOLE`;
                           originalQuery={query}
                           snapToGrid={snapToGrid}
                           rippleFrequency={rippleFrequency}
+                          isCoaxialBurstActive={isCoaxialBurstActive}
                         />
                       </div>
                     ) : isTripo3dMode ? (
@@ -2674,9 +2984,50 @@ METADATA SIGNATURE ASSIGNED // ARCHIVIST HUB CONSOLE`;
 
             {activeTab === 'monitor' ? (
               <>
+                {/* Visual Alert Notification that flashes when Anomalous Event is active */}
+                {isAnomalousEventActive && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                    className="mb-3 shrink-0"
+                  >
+                    <div 
+                      onClick={() => {
+                        const element = document.getElementById('anomalous-event-card');
+                        if (element) {
+                          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                          addLog("NAVIGATING TO ANOMALOUS EVENT DETAILS");
+                        }
+                      }}
+                      className="cursor-pointer bg-red-950/20 hover:bg-red-950/30 border-2 border-red-500/80 rounded-xl p-3 flex items-center justify-between gap-3 animate-pulse shadow-[0_0_15px_rgba(244,63,94,0.2)] transition-all group"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="relative flex h-2.5 w-2.5 shrink-0">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-405 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+                        </span>
+                        <div className="font-mono text-left">
+                          <div className="text-[9.5px] font-black tracking-wider text-red-100 uppercase flex items-center gap-1">
+                            <AlertTriangle size={10} className="text-red-400" />
+                            ANOMALOUS OVERLOAD DETECTED
+                          </div>
+                          <div className="text-[7px] text-zinc-400 uppercase tracking-wide mt-0.5">
+                            CLICK TO VIEW DETAILED SCAN DOSSIER
+                          </div>
+                        </div>
+                      </div>
+                      <span className="shrink-0 text-[7px] font-mono font-bold text-red-300 border border-red-500/30 px-1.5 py-0.5 rounded bg-red-950/40 group-hover:bg-red-500 group-hover:text-black transition-all uppercase tracking-wider">
+                        JUMP TO INFO ▲
+                      </span>
+                    </div>
+                  </motion.div>
+                )}
+
                 {/* Anomalous Event notification card for Mythic rarity */}
                 {oracleIntel && oracleIntel.rarity.toUpperCase().includes('MYTHIC') && (
                   <motion.div
+                    id="anomalous-event-card"
                     initial={{ opacity: 0, scale: 0.95, y: -20 }}
                     animate={{ 
                       opacity: 1, 
@@ -2779,6 +3130,43 @@ METADATA SIGNATURE ASSIGNED // ARCHIVIST HUB CONSOLE`;
                     <span className="text-[8px] font-mono tracking-widest text-zinc-500 uppercase">
                       {isAwakened ? "COSMIC OVERLAYS FULLY RENDERED" : "TRIGGER SECRETS REVEAL PROTOCOL"}
                     </span>
+                  </button>
+
+                  {/* Simulate Anomalous Event Button */}
+                  <button
+                    onClick={() => {
+                      if (isAnomalousEventActive) {
+                        setOracleIntel(null);
+                        setIsAnomalousEventActive(false);
+                        addLog(`🧹 [CLEARED SYSTEM] // ANOMALOUS MATRIX OVERLOAD PURGED`);
+                      } else {
+                        // Generate a random Mythic oracle intel to trigger the anomaly
+                        const fakeMythicIntel: OracleIntel = {
+                          oracleId: `ARC-${Math.floor(1000 + Math.random() * 9000)}`,
+                          name: "Void-Beacon Singularity Root",
+                          class: "Extradimensional Signal Anchor [Class S-I]",
+                          rarity: "Mythic Unique Anomaly",
+                          origin: "Temporal Echo Distortion Chamber Z-18",
+                          hash: "0x" + Array.from({ length: 40 }, () => Math.floor(Math.random() * 16).toString(16)).join(''),
+                          scannedAt: new Date().toLocaleTimeString(),
+                          loreFragment: "A localized resonance rift has shattered standard sensory boundaries. Extradimensional signal decay is cascading into the auxiliary fuel rods.",
+                          isGeneratingIcon: false,
+                          userQuery: query || "Void Beacon",
+                          activeVariant: activeVariant
+                        };
+                        setOracleIntel(fakeMythicIntel);
+                        setIsAnomalousEventActive(true);
+                        addLog(`⚠️ [SIMULATION ALERT] // TRIGGERED SIMULATED ANOMALOUS EVENT // DETECTING COSMIC RIFT OVERLOAD`);
+                      }
+                    }}
+                    className={`mt-3 w-full py-2.5 rounded-xl text-center px-3 font-mono text-[8.5px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 border cursor-pointer active:scale-95 ${
+                      isAnomalousEventActive
+                        ? 'bg-rose-950/20 border-rose-500/50 text-rose-300 animate-pulse hover:bg-rose-900/30'
+                        : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:border-rose-500/40 hover:text-rose-300'
+                    }`}
+                  >
+                    <AlertTriangle size={11} className={isAnomalousEventActive ? "text-rose-400 animate-bounce" : "text-zinc-500"} />
+                    <span>{isAnomalousEventActive ? "🧹 PURGE ANOMALOUS EVENT" : "⚡ TRIGGER ANOMALOUS EVENT"}</span>
                   </button>
 
                   {/* CRT Scanline Toggle Switch */}
@@ -2904,6 +3292,11 @@ METADATA SIGNATURE ASSIGNED // ARCHIVIST HUB CONSOLE`;
                   <VariantRadarChart activeVariant={activeVariant} />
                 </div>
 
+                {/* D3 Rarity Grade Distribution Chart */}
+                <div className={!data ? 'opacity-40 pointer-events-none' : 'opacity-100'}>
+                  <RarityDistributionChart intelHistory={intelHistory} />
+                </div>
+
                 {/* Interactive Origin Zone Mini-Map */}
                 <div className={!data ? 'opacity-40 pointer-events-none' : 'opacity-100'}>
                   <OriginMiniMap currentOrigin={oracleIntel?.origin} addLog={addLog} />
@@ -2979,7 +3372,7 @@ METADATA SIGNATURE ASSIGNED // ARCHIVIST HUB CONSOLE`;
               >
                 {/* Oracle AI Intel Entry Panel */}
                 {oracleIntel && (
-                  <div className="glass-panel border-cyan-500/10 rounded-xl p-4 flex flex-col relative overflow-hidden bg-cyan-950/5">
+                  <div id="intel-details-panel" className="glass-panel border-cyan-500/10 rounded-xl p-4 flex flex-col relative overflow-hidden bg-cyan-950/5">
                     <div className="absolute top-0 right-0 w-20 h-20 bg-cyan-500/5 rounded-full blur-xl pointer-events-none" />
                     
                     <div className="flex justify-between items-center border-b border-white/10 pb-2 mb-3">
@@ -2992,8 +3385,79 @@ METADATA SIGNATURE ASSIGNED // ARCHIVIST HUB CONSOLE`;
 
                     <div className="flex flex-col gap-2.5">
                       <div className="flex gap-4 items-start pb-1">
-                        {/* Interactive Relic Icon Slot */}
-                        <div className="w-18 h-18 shrink-0 relative rounded-lg border border-zinc-800 bg-zinc-950/80 overflow-hidden group flex items-center justify-center">
+                        {/* Interactive Relic Icon Slot with Mythic Particle Reactivity */}
+                        <div className={`w-18 h-18 shrink-0 relative rounded-lg bg-zinc-950/80 overflow-hidden group flex items-center justify-center transition-all duration-500 ${
+                          oracleIntel && oracleIntel.rarity.toUpperCase().includes('MYTHIC')
+                            ? "border border-amber-500/60 shadow-[0_0_15px_rgba(245,158,11,0.3)]"
+                            : "border border-zinc-800"
+                        }`}>
+                          {oracleIntel && oracleIntel.rarity.toUpperCase().includes('MYTHIC') && (
+                            <div className="absolute inset-0 pointer-events-none overflow-hidden z-10">
+                              {/* Sparkling border overlay */}
+                              <div className="absolute inset-0 border border-amber-500/40 shadow-[inset_0_0_8px_rgba(245,158,11,0.2)] rounded-lg" />
+                              {/* Concentrated radial backdrop glow */}
+                              <div className="absolute inset-0 bg-gradient-to-t from-rose-600/10 via-amber-500/5 to-transparent blend-screen opacity-70" />
+                              {/* Floating tiny sparks */}
+                              {Array.from({ length: 12 }).map((_, i) => {
+                                const delay = i * 0.16;
+                                const duration = 1.4 + (i % 3) * 0.35;
+                                const left = `${5 + (i * 19) % 90}%`;
+                                const size = 1.2 + (i % 3) * 0.8;
+                                return (
+                                  <motion.div
+                                    key={i}
+                                    className="absolute rounded-full bg-gradient-to-r from-amber-400 to-rose-400"
+                                    style={{
+                                      left,
+                                      bottom: '-4px',
+                                      width: size,
+                                      height: size,
+                                      boxShadow: '0 0 5px rgba(245,158,11,0.85)',
+                                    }}
+                                    animate={{
+                                      y: [-10, -78],
+                                      x: [0, (i % 2 === 0 ? 8 : -8) * ((i % 3) + 1)],
+                                      opacity: [0, 0.9, 0.35, 0],
+                                      scale: [0.8, 1.2, 0.6]
+                                    }}
+                                    transition={{
+                                      duration,
+                                      repeat: Infinity,
+                                      delay,
+                                      ease: "easeOut",
+                                    }}
+                                  />
+                                );
+                              })}
+                              {/* Sparkling status indicator stars */}
+                              {Array.from({ length: 4 }).map((_, i) => {
+                                const delay = i * 0.42;
+                                const top = `${15 + (i * 23) % 70}%`;
+                                const left = `${15 + (i * 19) % 70}%`;
+                                return (
+                                  <motion.div
+                                    key={`star-${i}`}
+                                    className="absolute text-[8px] text-amber-300 font-mono select-none"
+                                    style={{ top, left }}
+                                    animate={{
+                                      scale: [0, 1.35, 0],
+                                      opacity: [0, 0.85, 0],
+                                      rotate: [0, 180]
+                                    }}
+                                    transition={{
+                                      duration: 1.6,
+                                      repeat: Infinity,
+                                      delay,
+                                      ease: "easeInOut"
+                                    }}
+                                  >
+                                    ✦
+                                  </motion.div>
+                                );
+                              })}
+                            </div>
+                          )}
+
                           {oracleIntel.relicIcon ? (
                             <div className="relative w-full h-full">
                               <img 
@@ -3037,7 +3501,12 @@ METADATA SIGNATURE ASSIGNED // ARCHIVIST HUB CONSOLE`;
                             </div>
                             <div>
                               <span className="text-[7.5px] font-mono text-zinc-500 block uppercase tracking-wider">Signal Rarity</span>
-                              <span className="text-[9px] font-mono font-semibold text-brand-cyan truncate block">{oracleIntel.rarity}</span>
+                              <span className="text-[9px] font-mono font-semibold text-brand-cyan truncate block">
+                                {oracleIntel.rarity}
+                                <span className="text-[7.5px] text-zinc-500 ml-1 block mt-0.5">
+                                  Score: <span className="text-brand-cyan font-bold">{getRarityScoreAndSettings(oracleIntel.rarity).score}%</span>
+                                </span>
+                              </span>
                             </div>
                           </div>
                         </div>
@@ -3495,6 +3964,20 @@ METADATA SIGNATURE ASSIGNED // ARCHIVIST HUB CONSOLE`;
                 >
                   <Cpu size={12} className="text-rose-400" />
                   <span>EXPORT DECRYPT TO CLIPBOARD</span>
+                </button>
+
+                <button
+                  onClick={handleShareLore}
+                  disabled={isDecodingLoreRunning || !decodedLoreContent}
+                  className={`flex-1 py-2 px-3.5 border font-mono text-[8.5px] font-black tracking-widest uppercase rounded flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-40 disabled:pointer-events-none hover:shadow-[0_0_15px_rgba(244,63,94,0.25)] ${
+                    isShareCopied 
+                      ? "bg-rose-900/30 border-rose-450 text-white" 
+                      : "bg-[#0c0608] border-rose-500/40 hover:border-rose-400 text-rose-400 hover:text-rose-200"
+                  }`}
+                  title="Generate a clean formatted plain-text and copy/share it outside"
+                >
+                  <Share2 size={11} className={isShareCopied ? "animate-bounce text-rose-300" : "text-rose-400 animate-pulse"} />
+                  <span>{isShareCopied ? "LORE COPIED!" : "SHARE CLEAN LORE"}</span>
                 </button>
                 
                 {!isDecodingLoreRunning && decodedLoreContent && (

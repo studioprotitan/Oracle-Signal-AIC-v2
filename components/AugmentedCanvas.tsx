@@ -8,6 +8,42 @@ import { GeneratedImage, AnalysisResult } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ResonanceHeatmap } from './ResonanceHeatmap';
 
+const warpVariants = {
+  initial: {
+    scale: 0.1,
+    rotate: -180,
+    opacity: 0,
+    filter: 'blur(30px) brightness(4) saturate(2.5) contrast(1.8)',
+    borderRadius: '100%',
+  },
+  animate: {
+    scale: 1,
+    rotate: 0,
+    opacity: 1,
+    filter: 'blur(0px) brightness(1) saturate(1) contrast(1)',
+    borderRadius: '0%',
+    transition: {
+      type: 'spring',
+      stiffness: 90,
+      damping: 16,
+      mass: 0.9,
+      filter: { duration: 0.75, ease: 'easeOut' },
+      borderRadius: { duration: 0.95, ease: 'easeInOut' }
+    }
+  },
+  exit: {
+    scale: 2.5,
+    rotate: 180,
+    opacity: 0,
+    filter: 'blur(40px) brightness(0.2) saturate(0.2) contrast(3)',
+    borderRadius: '100%',
+    transition: {
+      duration: 0.8,
+      ease: [0.76, 0, 0.24, 1],
+    }
+  }
+};
+
 interface Props {
   image: GeneratedImage;
   analysis?: AnalysisResult | null;
@@ -49,6 +85,28 @@ export const AugmentedCanvas: React.FC<Props> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [pings, setPings] = useState<{ id: number }[]>([]);
+
+  // Dynamic portal accent colors for the warp vortex overlay
+  const getPortalColor = (type: 'ring' | 'accent' | 'glow') => {
+    switch (activeVariant) {
+      case 'abyss':
+        if (type === 'ring') return '#06b6d4';     // Cyan
+        if (type === 'accent') return '#3b82f6';   // Blue
+        return '#0891b2';                          // Teal
+      case 'chronos':
+        if (type === 'ring') return '#8b5cf6';     // Purple
+        if (type === 'accent') return '#f59e0b';   // Amber
+        return '#a78bfa';                          // Light violet
+      case 'aether':
+        if (type === 'ring') return '#fbc02d';     // Gold
+        if (type === 'accent') return '#ef4444';   // Red/Rose
+        return '#f59e0b';                          // Warm Amber
+      default:
+        if (type === 'ring') return '#22d3ee';     // Brighter cyan
+        if (type === 'accent') return '#a855f7';   // Purple
+        return '#06b6d4';                          // Cyan
+    }
+  };
 
   // Compute dynamic filters based on console parameters and active variant selection
   const getFilterStyle = () => {
@@ -136,16 +194,105 @@ export const AugmentedCanvas: React.FC<Props> = ({
             <div className="absolute inset-0 bg-white/[0.02] mix-blend-overlay pointer-events-none z-20 glitch-overlay" />
           )}
 
-          {/* Core Image Layer with fluid transforms */}
-          <motion.img 
-            src={`data:${image.mimeType};base64,${image.base64}`} 
-            alt="Relic Hologram"
-            className="w-full h-full object-cover transition-all duration-300"
-            style={{
-              filter: getFilterStyle(),
-              transform: getTransformStyle(),
-            }}
-          />
+          {/* Warp Portal Animate Presence of Core Image with integrated vortex ring */}
+          <AnimatePresence mode="popLayout">
+            <motion.div
+              key={`${image.base64.substring(0, 50)}_${activeVariant}`}
+              variants={warpVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              className="absolute inset-0 w-full h-full overflow-hidden"
+              style={{
+                transformStyle: 'preserve-3d',
+              }}
+            >
+              <motion.img 
+                src={`data:${image.mimeType};base64,${image.base64}`} 
+                alt="Relic Hologram"
+                className="w-full h-full object-cover"
+                style={{
+                  filter: getFilterStyle(),
+                  transform: getTransformStyle(),
+                }}
+              />
+
+              {/* Dynamic portal speed-line & vortex rings overlay during warp phases */}
+              <motion.div 
+                className="absolute inset-0 flex items-center justify-center pointer-events-none z-20"
+                initial={{ opacity: 0, scale: 0.1, rotate: 0 }}
+                animate={{ 
+                  opacity: [0, 1, 0, 0], 
+                  scale: [0.1, 1.4, 2.2, 2.5],
+                  rotate: [0, 180, 360, 480],
+                }}
+                exit={{
+                  opacity: [0, 1, 0],
+                  scale: [1.0, 2.5, 3.5],
+                  rotate: [0, -180, -360],
+                }}
+                transition={{ 
+                  duration: 0.95,
+                  ease: "easeOut"
+                }}
+              >
+                <svg className="w-80 h-80 opacity-70" viewBox="0 0 100 100">
+                  <defs>
+                    <radialGradient id="portalGlow" cx="50%" cy="50%" r="50%">
+                      <stop offset="0%" stopColor={getPortalColor('glow')} stopOpacity="0" />
+                      <stop offset="70%" stopColor={getPortalColor('ring')} stopOpacity="0.75" />
+                      <stop offset="95%" stopColor={getPortalColor('accent')} stopOpacity="0.9" />
+                      <stop offset="100%" stopColor={getPortalColor('accent')} stopOpacity="0" />
+                    </radialGradient>
+                  </defs>
+                  
+                  {/* Outer spinning warp ring */}
+                  <circle 
+                    cx="50" 
+                    cy="50" 
+                    r="38" 
+                    fill="none" 
+                    stroke="url(#portalGlow)" 
+                    strokeWidth="3.5" 
+                    strokeDasharray="20 6 12 10" 
+                  />
+                  {/* Secondary inner glowing orbit ring */}
+                  <circle 
+                    cx="50" 
+                    cy="50" 
+                    r="26" 
+                    fill="none" 
+                    stroke={getPortalColor('accent')} 
+                    strokeWidth="1.2" 
+                    strokeDasharray="6 4 10 6"
+                    opacity="0.8"
+                  />
+                  {/* Singularity core point */}
+                  <circle 
+                    cx="50" 
+                    cy="50" 
+                    r="4" 
+                    fill={getPortalColor('ring')} 
+                    opacity="0.9" 
+                  />
+                  {/* Spatial coordinate rays projecting outwards */}
+                  {Array.from({ length: 8 }).map((_, i) => (
+                    <line
+                      key={i}
+                      x1="50"
+                      y1="50"
+                      x2={50 + 38 * Math.cos((i * Math.PI) / 4)}
+                      y2={50 + 38 * Math.sin((i * Math.PI) / 4)}
+                      stroke={getPortalColor('ring')}
+                      strokeWidth="0.6"
+                      strokeDasharray="2 6"
+                      opacity="0.6"
+                    />
+                  ))}
+                </svg>
+              </motion.div>
+            </motion.div>
+          </AnimatePresence>
 
           {/* Holographic Resonance Heatmap Overlay Layer via D3 */}
           <AnimatePresence>
@@ -469,17 +616,28 @@ export const AugmentedCanvas: React.FC<Props> = ({
 
         {/* WET SURFACE WATER REFLECTION MATRIX (Cinematic layout requirement) */}
         <div className="absolute h-1/4 w-full left-0 right-0 top-full mt-0.5 pointer-events-none z-10 overflow-hidden">
-          {/* Flipped and blurred source image */}
+          {/* Flipped and blurred source image trailing the warping effects */}
           <div className="w-full h-[400%] relative origin-top scale-y-[-1]">
-            <img 
-              src={`data:${image.mimeType};base64,${image.base64}`} 
-              alt="Reflective Surface" 
-              className="w-full h-full object-cover opacity-15 filter blur-sm grayscale"
-              style={{
-                filter: getFilterStyle(),
-                transform: getTransformStyle(),
-              }}
-            />
+            <AnimatePresence mode="popLayout">
+              <motion.div
+                key={`${image.base64.substring(0, 50)}_${activeVariant}_reflect`}
+                variants={warpVariants}
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                className="absolute inset-0 w-full h-full"
+              >
+                <motion.img 
+                  src={`data:${image.mimeType};base64,${image.base64}`} 
+                  alt="Reflective Surface" 
+                  className="w-full h-full object-cover opacity-15 filter blur-sm grayscale"
+                  style={{
+                    filter: getFilterStyle(),
+                    transform: getTransformStyle(),
+                  }}
+                />
+              </motion.div>
+            </AnimatePresence>
           </div>
           {/* Ripples layer */}
           <div 
