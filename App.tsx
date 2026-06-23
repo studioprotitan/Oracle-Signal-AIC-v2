@@ -19,11 +19,11 @@ import { LoreNetworkGraph } from './components/LoreNetworkGraph';
 import { HeroLandingPage } from './components/HeroLandingPage';
 import { RarityDistributionChart } from './components/RarityDistributionChart';
 import { 
-  Upload, Sparkles, RefreshCw, Sliders, ChevronRight, Zap, 
+  Upload, Sparkles, RefreshCw, Sliders, ArrowUpDown, ChevronRight, Zap, 
   Terminal, ShieldCheck, Eye, EyeOff, Radio, HelpCircle, 
   Download, ShoppingBag, Database, Cpu, ExternalLink, X, FileJson, FileImage, Layers,
   Search, Trash2, History, BookOpen, AlertTriangle, GitCompare, Maximize2, Minimize2, Grid, Box, Magnet,
-  Volume2, VolumeX, Flame, Network, Share2
+  Volume2, VolumeX, Flame, Network, Share2, Info
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -542,6 +542,7 @@ function App() {
 
   const [oracleIntel, setOracleIntel] = useState<OracleIntel | null>(null);
   const [isAnomalousEventActive, setIsAnomalousEventActive] = useState<boolean>(false);
+  const [isAmbientAtmosphereEnabled, setIsAmbientAtmosphereEnabled] = useState<boolean>(false);
   const [isCoaxialBurstActive, setIsCoaxialBurstActive] = useState<boolean>(false);
   const [isMuted, setIsMuted] = useState<boolean>(() => {
     try {
@@ -553,6 +554,7 @@ function App() {
   });
   const [showHistoryDrawer, setShowHistoryDrawer] = useState<boolean>(false);
   const [historySearch, setHistorySearch] = useState<string>('');
+  const [historySortBy, setHistorySortBy] = useState<string>('date-desc');
   const [isCompareMode, setIsCompareMode] = useState<boolean>(false);
   const [compareSelection, setCompareSelection] = useState<string[]>([]);
   const [intelHistory, setIntelHistory] = useState<OracleIntel[]>(() => {
@@ -840,9 +842,82 @@ ${border}`;
 
   // Terminal telemetry logs
   const [logs, setLogs] = useState<string[]>(TERMINAL_LOGS_INITIAL);
+
+  // Toast notifications state
+  const [toasts, setToasts] = useState<{ id: string; message: string; type: 'success' | 'info' | 'warning' | 'error'; duration?: number }[]>([]);
+  const addToast = (message: string, type: 'success' | 'info' | 'warning' | 'error' = 'info', duration = 3500) => {
+    const id = Math.random().toString(36).substring(2, 9);
+    setToasts((prev) => [...prev, { id, message, type, duration }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, duration);
+  };
+
   const addLog = (message: string) => {
     const timestamp = new Date().toLocaleTimeString();
     setLogs((prev) => [`[${timestamp}] ${message}`, ...prev.slice(0, 8)]);
+
+    // Intercept logs to trigger elegant toast notifications for background operations
+    const msgUpper = message.toUpperCase();
+    let type: 'success' | 'info' | 'warning' | 'error' = 'info';
+    let shouldToast = false;
+    let cleanMessage = message;
+
+    if (message.includes('//')) {
+      cleanMessage = message.split('//').pop()?.trim() || message;
+    } else if (message.includes(':')) {
+      cleanMessage = message.split(':').pop()?.trim() || message;
+    }
+
+    if (
+      msgUpper.includes('SUCCESS') || 
+      msgUpper.includes('COMPLETED') || 
+      msgUpper.includes('EXPORTED') || 
+      msgUpper.includes('DOWNLOADED') ||
+      msgUpper.includes('DEPLOYED') ||
+      msgUpper.includes('CONSIGNED') ||
+      msgUpper.includes('REGISTERED') ||
+      msgUpper.includes('LOCKED') ||
+      msgUpper.includes('COMPLETE')
+    ) {
+      type = 'success';
+      shouldToast = true;
+    } else if (
+      msgUpper.includes('ERROR') || 
+      msgUpper.includes('FAILED') || 
+      msgUpper.includes('FAILURE') ||
+      msgUpper.includes('DENIED') ||
+      msgUpper.includes('BROKEN')
+    ) {
+      type = 'error';
+      shouldToast = true;
+    } else if (
+      msgUpper.includes('WARNING') || 
+      msgUpper.includes('ALERT') || 
+      msgUpper.includes('INTERRUPT') ||
+      msgUpper.includes('TIMEOUT') ||
+      msgUpper.includes('CORRUPT')
+    ) {
+      type = 'warning';
+      shouldToast = true;
+    } else if (
+      msgUpper.includes('LISTING STAGED') ||
+      msgUpper.includes('COMMENCE') ||
+      msgUpper.includes('INITIATING') ||
+      msgUpper.includes('CALIPER') ||
+      msgUpper.includes('SORT APPLIED') ||
+      msgUpper.includes('AUTO-TUNED') ||
+      msgUpper.includes('COAXIAL FIELD')
+    ) {
+      type = 'info';
+      shouldToast = true;
+    }
+
+    if (shouldToast) {
+      // Format clean message for perfect display
+      let toastMsg = cleanMessage.replace(/^[^\w\s\[\]\(\)\-\:\/]+/g, '').trim();
+      addToast(toastMsg, type);
+    }
   };
 
   // Automated slider movement when scrubbing is styled but user hits "VEO-3 Pulse"
@@ -912,6 +987,26 @@ ${border}`;
     ctx: null,
     osc1: null,
     osc2: null,
+    filter: null,
+    gainNode: null,
+    analyser: null
+  });
+
+  const ambientAtmosphereRef = useRef<{
+    ctx: AudioContext | null;
+    oscSub: OscillatorNode | null;
+    oscMod: OscillatorNode | null;
+    lfo: OscillatorNode | null;
+    lfoGain: GainNode | null;
+    filter: BiquadFilterNode | null;
+    gainNode: GainNode | null;
+    analyser: AnalyserNode | null;
+  }>({
+    ctx: null,
+    oscSub: null,
+    oscMod: null,
+    lfo: null,
+    lfoGain: null,
     filter: null,
     gainNode: null,
     analyser: null
@@ -1031,6 +1126,139 @@ ${border}`;
     }
   };
 
+  const startAmbientAtmosphere = () => {
+    if (isMuted) return;
+    try {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioContextClass) return;
+
+      if (ambientAtmosphereRef.current.ctx) {
+        if (ambientAtmosphereRef.current.ctx.state === 'suspended') {
+          ambientAtmosphereRef.current.ctx.resume();
+        }
+        return;
+      }
+
+      const ctx = new AudioContextClass();
+      const now = ctx.currentTime;
+
+      // Deep Sub oscillator (sine wave for pure low frequency)
+      const oscSub = ctx.createOscillator();
+      oscSub.type = 'sine';
+
+      // Texture modulator (triangle wave)
+      const oscMod = ctx.createOscillator();
+      oscMod.type = 'triangle';
+
+      // Low-frequency filter
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.Q.value = 4.0;
+
+      // LFO for dynamic rhythmic swelling
+      const lfo = ctx.createOscillator();
+      lfo.type = 'sine';
+      const lfoGain = ctx.createGain();
+
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 256;
+
+      const gainNode = ctx.createGain();
+      gainNode.gain.setValueAtTime(0, now);
+      gainNode.gain.linearRampToValueAtTime(0.04, now + 1.5); // Rich deep swell
+
+      // Initial settings based on current oracleIntel rarity
+      const score = oracleIntel ? getRarityScoreAndSettings(oracleIntel.rarity).score : 30;
+      
+      // Map rarity score to frequency parameters
+      // Low rarity = ultra-deep slow rumble (~35-45 Hz)
+      // High rarity = higher-energy resonant frequency (~70-95 Hz)
+      const subFreq = 35 + (score * 0.6); 
+      const modFreq = subFreq * 1.5; // Harmonic interval
+      const filterCutoff = 80 + (score * 2.5); // ~105Hz to ~330Hz
+      const lfoRate = 0.05 + (score * 0.015); // ~0.2Hz to ~1.55Hz pulsing
+
+      oscSub.frequency.setValueAtTime(subFreq, now);
+      oscMod.frequency.setValueAtTime(modFreq, now);
+      oscMod.detune.setValueAtTime(12, now); // subtle warmth
+
+      lfo.frequency.setValueAtTime(lfoRate, now);
+      lfoGain.gain.setValueAtTime(15, now); // modulate filter frequency by 15Hz
+
+      filter.frequency.setValueAtTime(filterCutoff, now);
+
+      // Connect LFO to filter frequency
+      lfo.connect(lfoGain);
+      lfoGain.connect(filter.frequency);
+
+      // Audio Graph
+      oscSub.connect(filter);
+      oscMod.connect(filter);
+      filter.connect(gainNode);
+      gainNode.connect(analyser);
+      analyser.connect(ctx.destination);
+
+      oscSub.start(now);
+      oscMod.start(now);
+      lfo.start(now);
+
+      ambientAtmosphereRef.current = {
+        ctx,
+        oscSub,
+        oscMod,
+        lfo,
+        lfoGain,
+        filter,
+        gainNode,
+        analyser
+      };
+
+      addLog(`MONITOR AUDIO // AMBIENT ATMOSPHERE ENGAGED [BASE FREQ: ${subFreq.toFixed(1)} HZ, PULSE: ${lfoRate.toFixed(2)} HZ]`);
+    } catch (e) {
+      console.warn("Could not activate ambient atmosphere soundscape:", e);
+    }
+  };
+
+  const stopAmbientAtmosphere = () => {
+    try {
+      const { ctx, oscSub, oscMod, lfo, gainNode } = ambientAtmosphereRef.current;
+      if (ctx && ctx.state !== 'closed') {
+        const now = ctx.currentTime;
+        if (gainNode) {
+          gainNode.gain.cancelScheduledValues(now);
+          gainNode.gain.setValueAtTime(gainNode.gain.value, now);
+          gainNode.gain.linearRampToValueAtTime(0, now + 0.5); // Smooth fade
+        }
+
+        ambientAtmosphereRef.current = {
+          ctx: null,
+          oscSub: null,
+          oscMod: null,
+          lfo: null,
+          lfoGain: null,
+          filter: null,
+          gainNode: null,
+          analyser: null
+        };
+
+        setTimeout(() => {
+          try {
+            if (oscSub) oscSub.stop();
+            if (oscMod) oscMod.stop();
+            if (lfo) lfo.stop();
+            if (ctx && ctx.state !== 'closed') {
+              ctx.close().catch(() => {});
+            }
+          } catch (err) {}
+        }, 600);
+
+        addLog("MONITOR AUDIO // AMBIENT ATMOSPHERE PLACED IN STANDBY");
+      }
+    } catch (e) {
+      console.warn("Could not stop ambient atmosphere soundscape:", e);
+    }
+  };
+
   const toggleMute = () => {
     const nextState = !isMuted;
     setIsMuted(nextState);
@@ -1125,11 +1353,54 @@ ${border}`;
       startAmbientSynth();
     } else {
       stopAmbientSynth();
+      stopAmbientAtmosphere();
     }
     return () => {
       stopAmbientSynth();
+      stopAmbientAtmosphere();
     };
   }, [data]);
+
+  // Synchronize Ambient Atmosphere soundscape parameters dynamically with the current asset's rarity
+  useEffect(() => {
+    if (isAmbientAtmosphereEnabled && !isMuted && data) {
+      // Start if not already running
+      if (!ambientAtmosphereRef.current.ctx) {
+        startAmbientAtmosphere();
+      } else {
+        // Smoothly adjust parameters
+        const { ctx, oscSub, oscMod, lfo, filter } = ambientAtmosphereRef.current;
+        if (ctx && ctx.state !== 'closed') {
+          const now = ctx.currentTime;
+          const score = oracleIntel ? getRarityScoreAndSettings(oracleIntel.rarity).score : 30;
+
+          const subFreq = 35 + (score * 0.6);
+          const modFreq = subFreq * 1.5;
+          const filterCutoff = 80 + (score * 2.5);
+          const lfoRate = 0.05 + (score * 0.015);
+
+          if (oscSub) {
+            oscSub.frequency.setTargetAtTime(subFreq, now, 0.2);
+          }
+          if (oscMod) {
+            oscMod.frequency.setTargetAtTime(modFreq, now, 0.2);
+          }
+          if (lfo) {
+            lfo.frequency.setTargetAtTime(lfoRate, now, 0.3);
+          }
+          if (filter) {
+            filter.frequency.setTargetAtTime(filterCutoff, now, 0.25);
+          }
+          addLog(`MONITOR AUDIO // ATMOSPHERE AUTO-TUNED TO RARITY SCORE [${score}%] -> ${subFreq.toFixed(1)} HZ`);
+        }
+      }
+    } else {
+      // Stop if running or if data is unloaded
+      if (ambientAtmosphereRef.current.ctx) {
+        stopAmbientAtmosphere();
+      }
+    }
+  }, [isAmbientAtmosphereEnabled, isMuted, oracleIntel, data]);
 
   // Handle dynamic mapping adjustments when sliders change
   useEffect(() => {
@@ -3228,6 +3499,37 @@ METADATA SIGNATURE ASSIGNED // ARCHIVIST HUB CONSOLE`;
                       Forces the spectral viewport into a metastable state, generating a rhythmic chromatic aberration drift and signal instability.
                     </span>
                   </div>
+
+                  {/* Ambient Atmosphere Toggle Switch */}
+                  <div className="mt-3.5 pt-3.5 border-t border-white/5 flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-widest flex items-center gap-1.5">
+                        <Terminal size={10} className="text-cyan-400 animate-pulse" />
+                        Ambient Atmosphere
+                      </span>
+                      {/* Interactive toggle switch custom element */}
+                      <button
+                        onClick={() => {
+                          const nextState = !isAmbientAtmosphereEnabled;
+                          setIsAmbientAtmosphereEnabled(nextState);
+                          addLog(`MONITOR AUDIO // AMBIENT ATMOSPHERE SYSTEM: [${nextState ? "ENGAGED" : "OFFLINE"}]`);
+                        }}
+                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border border-zinc-800 transition-colors duration-200 ease-in-out focus:outline-none ${
+                          isAmbientAtmosphereEnabled ? 'bg-cyan-950/40 border-cyan-400/50' : 'bg-zinc-950'
+                        }`}
+                        title="Toggle Low-Frequency Dynamic Soundscape"
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-3.5 w-3.5 transform rounded-full shadow-lg ring-0 transition duration-200 ease-in-out mt-[2px] ${
+                            isAmbientAtmosphereEnabled ? 'translate-x-[18px] bg-cyan-450 glow-cyan' : 'translate-x-[2px] bg-zinc-650'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                    <span className="text-[8px] font-mono text-zinc-500 uppercase tracking-wide leading-relaxed">
+                      Generates dynamic low-frequency sonic waves that modulate rhythmically based on the scanned Oracle's rarity score {oracleIntel ? `(${getRarityScoreAndSettings(oracleIntel.rarity).score}%)` : ""}.
+                    </span>
+                  </div>
                 </div>
 
                 {/* Variant Forge Grid */}
@@ -4285,23 +4587,45 @@ METADATA SIGNATURE ASSIGNED // ARCHIVIST HUB CONSOLE`;
 
                 {/* Search & Purge bar controls */}
                 <div className="p-4 bg-zinc-950/40 border-b border-white/5 flex flex-col gap-3">
-                  <div className="relative">
-                    <Search size={13} className="absolute left-3 top-2.5 text-zinc-500" />
-                    <input
-                      type="text"
-                      placeholder="FILTER BY DESIGNATE, CLASS OR RARITY..."
-                      value={historySearch}
-                      onChange={(e) => setHistorySearch(e.target.value)}
-                      className="w-full bg-zinc-950/80 border border-zinc-850 rounded px-9 py-2 text-[10px] font-mono focus:outline-none focus:border-cyan-500/50 placeholder:text-zinc-600 block uppercase text-white"
-                    />
-                    {historySearch && (
-                      <button
-                        onClick={() => setHistorySearch('')}
-                        className="absolute right-3 top-2.5 text-[9px] font-mono text-zinc-500 hover:text-zinc-300 uppercase"
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Search size={13} className="absolute left-3 top-2.5 text-zinc-500" />
+                      <input
+                        type="text"
+                        placeholder="FILTER BY DESIGNATE, CLASS OR RARITY..."
+                        value={historySearch}
+                        onChange={(e) => setHistorySearch(e.target.value)}
+                        className="w-full bg-zinc-950/80 border border-zinc-850 rounded px-9 py-2 text-[10px] font-mono focus:outline-none focus:border-cyan-500/50 placeholder:text-zinc-600 block uppercase text-white"
+                      />
+                      {historySearch && (
+                        <button
+                          onClick={() => setHistorySearch('')}
+                          className="absolute right-3 top-2.5 text-[9px] font-mono text-zinc-500 hover:text-zinc-300 uppercase"
+                        >
+                          [clear]
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="relative shrink-0 flex items-center gap-1.5 bg-zinc-950/80 border border-zinc-850 rounded px-2">
+                      <ArrowUpDown size={11} className="text-cyan-500/80" />
+                      <select
+                        value={historySortBy}
+                        onChange={(e) => {
+                          setHistorySortBy(e.target.value);
+                          addLog(`ARCHIVE SYSTEM // INTELLIGENCE ARCHIVE SORT APPLIED: [${e.target.value.toUpperCase()}]`);
+                        }}
+                        className="bg-transparent text-cyan-400 hover:text-cyan-300 text-[9px] font-mono focus:outline-none uppercase cursor-pointer py-1.5 h-full transition-all border-none outline-none pr-1"
+                        title="Sort Saved History Records"
                       >
-                        [clear]
-                      </button>
-                    )}
+                        <option value="date-desc" className="bg-[#06080c] text-zinc-300">Date: Newest</option>
+                        <option value="date-asc" className="bg-[#06080c] text-zinc-300">Date: Oldest</option>
+                        <option value="rarity-desc" className="bg-[#06080c] text-zinc-300">Rarity: Highest</option>
+                        <option value="rarity-asc" className="bg-[#06080c] text-zinc-300">Rarity: Lowest</option>
+                        <option value="class-asc" className="bg-[#06080c] text-zinc-300">Class: A-Z</option>
+                        <option value="class-desc" className="bg-[#06080c] text-zinc-300">Class: Z-A</option>
+                      </select>
+                    </div>
                   </div>
 
                   <div className="flex justify-between items-center text-[8px] font-mono">
@@ -4400,6 +4724,42 @@ METADATA SIGNATURE ASSIGNED // ARCHIVIST HUB CONSOLE`;
                     const itemA = compareSelection[0] ? filtered.find(it => it.oracleId === compareSelection[0]) || intelHistory.find(it => it.oracleId === compareSelection[0]) : null;
                     const itemB = compareSelection[1] ? filtered.find(it => it.oracleId === compareSelection[1]) || intelHistory.find(it => it.oracleId === compareSelection[1]) : null;
 
+                    const sortedFiltered = [...filtered].sort((a, b) => {
+                      if (historySortBy === 'date-desc') {
+                        return new Date(b.scannedAt).getTime() - new Date(a.scannedAt).getTime();
+                      }
+                      if (historySortBy === 'date-asc') {
+                        return new Date(a.scannedAt).getTime() - new Date(b.scannedAt).getTime();
+                      }
+                      if (historySortBy === 'rarity-desc') {
+                        const scoreA = getRarityScoreAndSettings(a.rarity).score;
+                        const scoreB = getRarityScoreAndSettings(b.rarity).score;
+                        if (scoreA !== scoreB) {
+                          return scoreB - scoreA;
+                        }
+                        return a.name.localeCompare(b.name);
+                      }
+                      if (historySortBy === 'rarity-asc') {
+                        const scoreA = getRarityScoreAndSettings(a.rarity).score;
+                        const scoreB = getRarityScoreAndSettings(b.rarity).score;
+                        if (scoreA !== scoreB) {
+                          return scoreA - scoreB;
+                        }
+                        return a.name.localeCompare(b.name);
+                      }
+                      if (historySortBy === 'class-asc') {
+                        const cmp = a.class.localeCompare(b.class);
+                        if (cmp !== 0) return cmp;
+                        return a.name.localeCompare(b.name);
+                      }
+                      if (historySortBy === 'class-desc') {
+                        const cmp = b.class.localeCompare(a.class);
+                        if (cmp !== 0) return cmp;
+                        return a.name.localeCompare(b.name);
+                      }
+                      return 0;
+                    });
+
                     return (
                       <>
                         {isCompareMode && itemA && itemB && (
@@ -4427,7 +4787,7 @@ METADATA SIGNATURE ASSIGNED // ARCHIVIST HUB CONSOLE`;
                         )}
 
                         <AnimatePresence mode="popLayout" initial={false}>
-                          {filtered.map((item, index) => {
+                          {sortedFiltered.map((item, index) => {
                             const selectedIdx = compareSelection.indexOf(item.oracleId);
                             const isAlpha = selectedIdx === 0;
                             const isBeta = selectedIdx === 1;
@@ -4650,6 +5010,67 @@ METADATA SIGNATURE ASSIGNED // ARCHIVIST HUB CONSOLE`;
             </button>
           </div>
         )}
+
+        {/* Floating Toast Notification Stack */}
+        <div className="fixed bottom-6 right-6 z-55 flex flex-col gap-2 max-w-sm pointer-events-none">
+          <AnimatePresence mode="popLayout">
+            {toasts.map((toast) => {
+              let icon = <Info size={11} className="text-cyan-400" />;
+              let borderColor = "border-cyan-500/30";
+              let glowColor = "shadow-[0_0_12px_rgba(6,182,212,0.12)]";
+              let textColor = "text-cyan-300";
+              let bg = "bg-black/90";
+
+              if (toast.type === 'success') {
+                icon = <ShieldCheck size={11} className="text-emerald-400" />;
+                borderColor = "border-emerald-500/30";
+                glowColor = "shadow-[0_0_12px_rgba(16,185,129,0.12)]";
+                textColor = "text-emerald-300";
+                bg = "bg-black/90";
+              } else if (toast.type === 'warning') {
+                icon = <AlertTriangle size={11} className="text-amber-400" />;
+                borderColor = "border-amber-500/30";
+                glowColor = "shadow-[0_0_12px_rgba(245,158,11,0.12)]";
+                textColor = "text-amber-300";
+                bg = "bg-black/90";
+              } else if (toast.type === 'error') {
+                icon = <X size={11} className="text-rose-400" />;
+                borderColor = "border-rose-500/30";
+                glowColor = "shadow-[0_0_12px_rgba(244,63,94,0.12)]";
+                textColor = "text-rose-300";
+                bg = "bg-black/90";
+              }
+
+              return (
+                <motion.div
+                  key={toast.id}
+                  layout
+                  initial={{ opacity: 0, y: 20, scale: 0.92 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -20, scale: 0.92, transition: { duration: 0.15 } }}
+                  className={`pointer-events-auto flex items-start gap-2 px-2.5 py-2 ${bg} backdrop-blur-md border ${borderColor} rounded shadow-[0_4px_16px_rgba(0,0,0,0.8)] ${glowColor} font-mono w-[260px] text-[8.5px] uppercase leading-tight tracking-wider select-none`}
+                >
+                  <div className="mt-[2px] shrink-0">{icon}</div>
+                  <div className="flex-1 flex flex-col gap-0.5">
+                    <div className="flex justify-between items-center text-[6px] text-zinc-500 font-bold tracking-widest pb-0.5 border-b border-zinc-850/65 mb-1.5">
+                      <span>SYSTEM TRANSMISSION</span>
+                      <span className={toast.type === 'success' ? 'text-emerald-500' : toast.type === 'warning' ? 'text-amber-500' : toast.type === 'error' ? 'text-rose-500' : 'text-cyan-500'}>{toast.type}</span>
+                    </div>
+                    <span className={textColor}>{toast.message}</span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setToasts((prev) => prev.filter((t) => t.id !== toast.id));
+                    }}
+                    className="text-zinc-600 hover:text-zinc-400 transition-colors shrink-0 ml-1.5 cursor-pointer"
+                  >
+                    <X size={9} />
+                  </button>
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
+        </div>
 
           </motion.div>
         )}

@@ -20,9 +20,11 @@ import "@babylonjs/loaders";
 import { 
   Play, Pause, RefreshCw, Layers, Shield, Wrench, AlertTriangle, 
   Heart, Activity, Gauge, Navigation, Compass, User, Zap, Database, 
-  Wallet, CreditCard, Flame, Skull, ShieldCheck, Check, Server
+  Wallet, CreditCard, Flame, Skull, ShieldCheck, Check, Server,
+  ZoomIn, ZoomOut, RotateCw, Maximize2, ChevronUp, ChevronDown, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { RiftIncursionScanner } from './RiftIncursionScanner';
+import { glbLoaderService } from '../services/glbLoaderService';
 
 interface Props {
   addLog: (msg: string) => void;
@@ -157,6 +159,139 @@ export const RepairBay3D: React.FC<Props> = ({
   const [currentLightPreset, setCurrentLightPreset] = useState<'flood' | 'excitation' | 'lowglow'>('flood');
   const [currentCameraPreset, setCurrentCameraPreset] = useState<'orbit' | 'head' | 'chassis' | 'bottom'>('orbit');
   const [isDroneInspectOn, setIsDroneInspectOn] = useState<boolean>(false);
+
+  // Cockpit 3D model preloading and selection
+  const [cockpitModel, setCockpitModel] = useState<'train' | 'infiltrator'>('train');
+  const [isInfiltratorPreloaded, setIsInfiltratorPreloaded] = useState<boolean>(false);
+  const cockpitModelRef = useRef<'train' | 'infiltrator'>('train');
+  const [isExplodedView, setIsExplodedView] = useState<boolean>(false);
+  const isExplodedViewRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    isExplodedViewRef.current = isExplodedView;
+  }, [isExplodedView]);
+
+  // 3D Surface Measurement State & References
+  const [isMeasureMode, setIsMeasureMode] = useState<boolean>(false);
+  const isMeasureModeRef = useRef<boolean>(false);
+  const [measurePoints, setMeasurePoints] = useState<{ p1: Vector3 | null, p2: Vector3 | null }>({ p1: null, p2: null });
+  const measurePointsRef = useRef<{ p1: Vector3 | null, p2: Vector3 | null }>({ p1: null, p2: null });
+  const [measureDistance, setMeasureDistance] = useState<number | null>(null);
+
+  const measureP1MeshRef = useRef<any>(null);
+  const measureP2MeshRef = useRef<any>(null);
+  const measureLineMeshRef = useRef<any>(null);
+
+  const clearMeasurementSilent = () => {
+    if (measureP1MeshRef.current) {
+      measureP1MeshRef.current.dispose();
+      measureP1MeshRef.current = null;
+    }
+    if (measureP2MeshRef.current) {
+      measureP2MeshRef.current.dispose();
+      measureP2MeshRef.current = null;
+    }
+    if (measureLineMeshRef.current) {
+      measureLineMeshRef.current.dispose();
+      measureLineMeshRef.current = null;
+    }
+    setMeasurePoints({ p1: null, p2: null });
+    setMeasureDistance(null);
+  };
+
+  const handleClearMeasurement = () => {
+    clearMeasurementSilent();
+    addLog("STRUCT DIAG // SURFACE CALIPER CLEARED AND RESET TO NOMINAL");
+  };
+
+  useEffect(() => {
+    isMeasureModeRef.current = isMeasureMode;
+    if (!isMeasureMode) {
+      clearMeasurementSilent();
+    }
+  }, [isMeasureMode]);
+
+  useEffect(() => {
+    measurePointsRef.current = measurePoints;
+  }, [measurePoints]);
+
+  // 3D Camera Controls State and Reference
+  const mainCameraRef = useRef<ArcRotateCamera | null>(null);
+  const [isAutoOrbitOn, setIsAutoOrbitOn] = useState<boolean>(true);
+  const isAutoOrbitOnRef = useRef<boolean>(true);
+
+  useEffect(() => {
+    isAutoOrbitOnRef.current = isAutoOrbitOn;
+  }, [isAutoOrbitOn]);
+
+  useEffect(() => {
+    cockpitModelRef.current = cockpitModel;
+  }, [cockpitModel]);
+
+  // Camera Adjustment Handlers
+  const handleZoomIn = () => {
+    if (mainCameraRef.current) {
+      const cam = mainCameraRef.current;
+      cam.radius = Math.max(cam.lowerRadiusLimit || 3.0, cam.radius - 0.8);
+      addLog(`CAM CONTROLS // ZOOMED IN: DEPTH [${cam.radius.toFixed(1)}m]`);
+    }
+  };
+
+  const handleZoomOut = () => {
+    if (mainCameraRef.current) {
+      const cam = mainCameraRef.current;
+      cam.radius = Math.min(cam.upperRadiusLimit || 15.0, cam.radius + 0.8);
+      addLog(`CAM CONTROLS // ZOOMED OUT: DEPTH [${cam.radius.toFixed(1)}m]`);
+    }
+  };
+
+  const handleOrbitLeft = () => {
+    if (mainCameraRef.current) {
+      setIsAutoOrbitOn(false);
+      const cam = mainCameraRef.current;
+      cam.alpha -= 0.25;
+      addLog(`CAM CONTROLS // ROTATED PORT AXIS: ANGLE [${(cam.alpha * 180 / Math.PI).toFixed(0)}°]`);
+    }
+  };
+
+  const handleOrbitRight = () => {
+    if (mainCameraRef.current) {
+      setIsAutoOrbitOn(false);
+      const cam = mainCameraRef.current;
+      cam.alpha += 0.25;
+      addLog(`CAM CONTROLS // ROTATED STARBOARD AXIS: ANGLE [${(cam.alpha * 180 / Math.PI).toFixed(0)}°]`);
+    }
+  };
+
+  const handleOrbitUp = () => {
+    if (mainCameraRef.current) {
+      setIsAutoOrbitOn(false);
+      const cam = mainCameraRef.current;
+      cam.beta = Math.max(0.1, cam.beta - 0.15);
+      addLog(`CAM CONTROLS // PITCHED ELEVATION UP: ANGLE [${(cam.beta * 180 / Math.PI).toFixed(0)}°]`);
+    }
+  };
+
+  const handleOrbitDown = () => {
+    if (mainCameraRef.current) {
+      setIsAutoOrbitOn(false);
+      const cam = mainCameraRef.current;
+      cam.beta = Math.min((cam.upperBetaLimit || Math.PI / 2.05), cam.beta + 0.15);
+      addLog(`CAM CONTROLS // PITCHED ELEVATION DOWN: ANGLE [${(cam.beta * 180 / Math.PI).toFixed(0)}°]`);
+    }
+  };
+
+  const handleResetCamera = () => {
+    if (mainCameraRef.current) {
+      const cam = mainCameraRef.current;
+      cam.alpha = Math.PI / 4;
+      cam.beta = Math.PI / 2.3;
+      cam.radius = 9.0;
+      cam.target.set(0, 0.7, 0);
+      setIsAutoOrbitOn(false);
+      addLog("CAM CONTROLS // CAMERA CHASSIS CALIBRATED TO ORIGINAL GEOMETRY");
+    }
+  };
 
   // Refs and support states for terminal
   const inspectionCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -933,6 +1068,14 @@ export const RepairBay3D: React.FC<Props> = ({
     scene.clearColor = new Color4(0.01, 0.02, 0.04, 1.0); // Dark matte space theme
     sceneRef.current = scene;
 
+    // Pre-load the Stealth Infiltrator GLB asset via glbLoaderService
+    glbLoaderService.preLoadModel(scene, "cst-ert-stealth-infiltrator-x2-a.glb").then((success) => {
+      setIsInfiltratorPreloaded(true);
+      addLog(`GLB SYSTEM // PRE-LOAD SEQUENCE COMPLETED: CST-ERT STEALTH INFILTRATOR X2-A [STATUS: READY]`);
+    }).catch(err => {
+      console.error("GLB SYSTEM // Preload failed:", err);
+    });
+
     const camera = new ArcRotateCamera(
       "repairBayCamera",
       Math.PI / 4,           // Alpha
@@ -941,10 +1084,83 @@ export const RepairBay3D: React.FC<Props> = ({
       new Vector3(0, 0.7, 0), // Target position
       scene
     );
+    mainCameraRef.current = camera;
     camera.attachControl(canvasRef.current, true);
     camera.lowerRadiusLimit = 5.0;
     camera.upperRadiusLimit = 15.0;
     camera.upperBetaLimit = Math.PI / 2.05;
+
+    // Set up pointer down event for model surface measurement picking
+    scene.onPointerDown = (evt, pickResult) => {
+      if (!isMeasureModeRef.current) return;
+      if (evt.button !== 0) return; // Left click only
+      
+      if (pickResult && pickResult.hit && pickResult.pickedPoint) {
+        const point = pickResult.pickedPoint;
+        const currentPoints = measurePointsRef.current;
+
+        if (!currentPoints.p1 || (currentPoints.p1 && currentPoints.p2)) {
+          // Setting the first point - dispose old structures
+          if (measureP1MeshRef.current) {
+            measureP1MeshRef.current.dispose();
+            measureP1MeshRef.current = null;
+          }
+          if (measureP2MeshRef.current) {
+            measureP2MeshRef.current.dispose();
+            measureP2MeshRef.current = null;
+          }
+          if (measureLineMeshRef.current) {
+            measureLineMeshRef.current.dispose();
+            measureLineMeshRef.current = null;
+          }
+
+          // Generate point A anchor visual sphere
+          const sphere1 = MeshBuilder.CreateSphere("measure_anchor_p1", { diameter: 0.14 }, scene);
+          sphere1.position.copyFrom(point);
+          const mat1 = new StandardMaterial("measure_anchor_p1_mat", scene);
+          mat1.emissiveColor = new Color3(0.0, 1.0, 0.85); // Neon cyan
+          mat1.disableLighting = true;
+          sphere1.material = mat1;
+          measureP1MeshRef.current = sphere1;
+
+          setMeasurePoints({ p1: point, p2: null });
+          setMeasureDistance(null);
+          addLog(`STRUCT DIAG // CALIPER POINT A DEPLOYED AT [X: ${point.x.toFixed(2)}, Y: ${point.y.toFixed(2)}, Z: ${point.z.toFixed(2)}]`);
+        } else {
+          // Setting the second point - dispose old second point/line
+          if (measureP2MeshRef.current) {
+            measureP2MeshRef.current.dispose();
+            measureP2MeshRef.current = null;
+          }
+          if (measureLineMeshRef.current) {
+            measureLineMeshRef.current.dispose();
+            measureLineMeshRef.current = null;
+          }
+
+          // Generate point B anchor visual sphere
+          const sphere2 = MeshBuilder.CreateSphere("measure_anchor_p2", { diameter: 0.14 }, scene);
+          sphere2.position.copyFrom(point);
+          const mat2 = new StandardMaterial("measure_anchor_p2_mat", scene);
+          mat2.emissiveColor = new Color3(1.0, 0.15, 0.55); // Neon pink
+          mat2.disableLighting = true;
+          sphere2.material = mat2;
+          measureP2MeshRef.current = sphere2;
+
+          // Generate connect line
+          const line = MeshBuilder.CreateLines("measure_span_line", { points: [currentPoints.p1, point] }, scene);
+          line.color = new Color3(0.0, 0.9, 1.0); // Bright cyan connector line
+          measureLineMeshRef.current = line;
+
+          const dist = Vector3.Distance(currentPoints.p1, point);
+          const auDist = dist * 5.4; // 1 unit = 5.4 Abyssum Units
+
+          setMeasurePoints({ p1: currentPoints.p1, p2: point });
+          setMeasureDistance(auDist);
+          addLog(`STRUCT DIAG // CALIPER POINT B DEPLOYED AT [X: ${point.x.toFixed(2)}, Y: ${point.y.toFixed(2)}, Z: ${point.z.toFixed(2)}]`);
+          addLog(`STRUCT DIAG // ESTIMATED SPAN CORE: [${auDist.toFixed(2)} AU]`);
+        }
+      }
+    };
 
     const hLight = new HemisphericLight("ambientLight", new Vector3(0, 1, 0), scene);
     hLight.intensity = 0.25;
@@ -1390,153 +1606,217 @@ export const RepairBay3D: React.FC<Props> = ({
     rootNodeRef.current = carriageRoot;
     carriageRoot.position.y = 0.5; 
 
-    // Heavy Main Armored Under-carriage Chassis frame
-    const chassis = MeshBuilder.CreateBox("carChassis", { width: 4.2, height: 0.35, depth: 1.84 }, scene);
-    chassis.parent = carriageRoot;
-    chassis.position.set(0, -0.15, 0);
-    const chassisMat = new StandardMaterial("chassisBlockMat", scene);
-    chassisMat.diffuseColor = new Color3(0.12, 0.14, 0.17);
-    chassisMat.specularColor = new Color3(0.4, 0.45, 0.5);
-    chassis.material = chassisMat;
+    const buildCockpitMesh = () => {
+      // Clear previous chassis meshes except the hologram card
+      carriageRoot.getChildren().forEach((child) => {
+        if (
+          child.name !== "diagnosticHoloCard" && 
+          child.name !== "diagnosticHoloCard_child" && 
+          child.name !== "diagnosticHoloCard_child_child"
+        ) {
+          child.dispose();
+        }
+      });
+      fanBladesRef.current = [];
 
-    // Primary Armored Cargo Tank Carriage body
-    const bodyBox = MeshBuilder.CreateBox("carBody", { width: 3.8, height: 1.5, depth: 1.6 }, scene);
-    bodyBox.parent = carriageRoot;
-    bodyBox.position.set(0, 0.75, 0);
-    const bodyMat = new StandardMaterial("bodyBlockMat", scene);
-    bodyMat.diffuseColor = new Color3(0.15, 0.17, 0.22); // Armored steel
-    bodyMat.specularColor = new Color3(0.2, 0.2, 0.22);
-    bodyBox.material = bodyMat;
+      if (cockpitModelRef.current === 'train') {
+        // Heavy Main Armored Under-carriage Chassis frame
+        const chassis = MeshBuilder.CreateBox("carChassis", { width: 4.2, height: 0.35, depth: 1.84 }, scene);
+        chassis.parent = carriageRoot;
+        chassis.position.set(0, -0.15, 0);
+        const chassisMat = new StandardMaterial("chassisBlockMat", scene);
+        chassisMat.diffuseColor = new Color3(0.12, 0.14, 0.17);
+        chassisMat.specularColor = new Color3(0.4, 0.45, 0.5);
+        chassis.material = chassisMat;
 
-    // Glowing core reactor slot (The decal central capsule)
-    const decalCore = MeshBuilder.CreateBox("decalPlate", { width: 1.85, height: 0.45, depth: 1.63 }, scene);
-    decalCore.parent = carriageRoot;
-    decalCore.position.set(0, 0.75, 0);
-    const decalMat = new StandardMaterial("decalBlockMat", scene);
-    decalMat.diffuseColor = new Color3(0.02, 0.03, 0.04);
-    decalMat.emissiveColor = new Color3(0.0, 0.7, 1.0); // Indigo/Teal Reactor core glow
-    decalCore.material = decalMat;
+        // Primary Armored Cargo Tank Carriage body
+        const bodyBox = MeshBuilder.CreateBox("carBody", { width: 3.8, height: 1.5, depth: 1.6 }, scene);
+        bodyBox.parent = carriageRoot;
+        bodyBox.position.set(0, 0.75, 0);
+        const bodyMat = new StandardMaterial("bodyBlockMat", scene);
+        bodyMat.diffuseColor = new Color3(0.15, 0.17, 0.22); // Armored steel
+        bodyMat.specularColor = new Color3(0.2, 0.2, 0.22);
+        bodyBox.material = bodyMat;
 
-    // A. THERMAL SHIELD PANELING (Raised modular layered armor panels on body sides & roof top)
-    const shieldPlateMat = new StandardMaterial("shieldPlateMat", scene);
-    shieldPlateMat.diffuseColor = new Color3(0.26, 0.28, 0.32); // Steel slate shield plates
-    shieldPlateMat.specularColor = new Color3(0.75, 0.6, 0.25); // Gold/bronze metallic trim highlights
+        // Glowing core reactor slot (The decal central capsule)
+        const decalCore = MeshBuilder.CreateBox("decalPlate", { width: 1.85, height: 0.45, depth: 1.63 }, scene);
+        decalCore.parent = carriageRoot;
+        decalCore.position.set(0, 0.75, 0);
+        const decalMat = new StandardMaterial("decalBlockMat", scene);
+        decalMat.diffuseColor = new Color3(0.02, 0.03, 0.04);
+        decalMat.emissiveColor = new Color3(0.0, 0.7, 1.0); // Indigo/Teal Reactor core glow
+        decalCore.material = decalMat;
 
-    // Roof thermal panels
-    const roofShield1 = MeshBuilder.CreateBox("roofShieldAngleL", { width: 1.6, height: 0.1, depth: 0.8 }, scene);
-    roofShield1.parent = carriageRoot;
-    roofShield1.position.set(-0.8, 1.55, 0.4);
-    roofShield1.rotation.z = Math.PI / 18; // Slight angle shield tilt
-    roofShield1.material = shieldPlateMat;
+        // High-Tech Internal Diagnostic Powertrain Core (visible only during Exploded View)
+        const coreDiag = MeshBuilder.CreateBox("internalCoreDiagBox", { width: 1.6, height: 0.8, depth: 1.0 }, scene);
+        coreDiag.parent = carriageRoot;
+        coreDiag.position.set(0, 0.75, 0);
+        const coreDiagMat = new StandardMaterial("internalCoreDiagBoxMat", scene);
+        coreDiagMat.diffuseColor = new Color3(0.0, 0.5, 0.85);
+        coreDiagMat.emissiveColor = new Color3(0.0, 0.8, 1.0);
+        coreDiagMat.wireframe = true;
+        coreDiag.material = coreDiagMat;
+        coreDiag.visibility = 0; // Animates with explodedLerp in the render loop
 
-    const roofShield2 = MeshBuilder.CreateBox("roofShieldAngleR", { width: 1.6, height: 0.1, depth: 0.8 }, scene);
-    roofShield2.parent = carriageRoot;
-    roofShield2.position.set(0.8, 1.55, -0.4);
-    roofShield2.rotation.z = -Math.PI / 18;
-    roofShield2.material = shieldPlateMat;
+        const coreReactor = MeshBuilder.CreateSphere("internalCoreReactorSphere", { diameter: 0.5 }, scene);
+        coreReactor.parent = carriageRoot;
+        coreReactor.position.set(0, 0.75, 0);
+        const coreReactorMat = new StandardMaterial("internalCoreReactorMat", scene);
+        coreReactorMat.emissiveColor = new Color3(1.0, 0.15, 0.5); // Intense pinkish-magenta reactor core
+        coreReactorMat.disableLighting = true;
+        coreReactor.material = coreReactorMat;
+        coreReactor.visibility = 0;
 
-    // B. ROTATING COOLING FANS
-    const fanBladesArray: any[] = [];
-    const fanSides = [0.81, -0.81];
-    fanSides.forEach((zSide, fIdx) => {
-      // Fan Shroud Outer casing Ring
-      const fanHous = MeshBuilder.CreateCylinder(`coolingFanHousing_${fIdx}`, {
-        diameter: 0.6,
-        height: 0.06,
-        tessellation: 16
-      }, scene);
-      fanHous.parent = carriageRoot;
-      fanHous.position.set(0, 0.75, zSide);
-      fanHous.rotation.x = Math.PI / 2;
-      fanHous.material = columnPowerMat;
+        // A. THERMAL SHIELD PANELING (Raised modular layered armor panels on body sides & roof top)
+        const shieldPlateMat = new StandardMaterial("shieldPlateMat", scene);
+        shieldPlateMat.diffuseColor = new Color3(0.26, 0.28, 0.32); // Steel slate shield plates
+        shieldPlateMat.specularColor = new Color3(0.75, 0.6, 0.25); // Gold/bronze metallic trim highlights
 
-      // Center spinning blade hub spinner
-      const bladeHub = MeshBuilder.CreateCylinder(`bladeHub_${fIdx}`, {
-        diameter: 0.15,
-        height: 0.08,
-        tessellation: 8
-      }, scene);
-      bladeHub.parent = carriageRoot;
-      bladeHub.position.set(0, 0.75, zSide * 1.05);
-      bladeHub.rotation.x = Math.PI / 2;
-      bladeHub.material = shieldPlateMat;
+        // Roof thermal panels
+        const roofShield1 = MeshBuilder.CreateBox("roofShieldAngleL", { width: 1.6, height: 0.1, depth: 0.8 }, scene);
+        roofShield1.parent = carriageRoot;
+        roofShield1.position.set(-0.8, 1.55, 0.4);
+        roofShield1.rotation.z = Math.PI / 18; // Slight angle shield tilt
+        roofShield1.material = shieldPlateMat;
 
-      // 4 interior mechanical fan blades
-      const linkRoot = new TransformNode(`fanLinkRoot_${fIdx}`, scene);
-      linkRoot.parent = carriageRoot;
-      linkRoot.position.set(0, 0.75, zSide * 1.05);
-      linkRoot.rotation.z = 0; // Rotates real-time in the animation loop!
+        const roofShield2 = MeshBuilder.CreateBox("roofShieldAngleR", { width: 1.6, height: 0.1, depth: 0.8 }, scene);
+        roofShield2.parent = carriageRoot;
+        roofShield2.position.set(0.8, 1.55, -0.4);
+        roofShield2.rotation.z = -Math.PI / 18;
+        roofShield2.material = shieldPlateMat;
 
-      for (let b = 0; b < 4; b++) {
-        const blade = MeshBuilder.CreateBox(`fanBlade_${fIdx}_${b}`, {
-          width: 0.06,
-          height: 0.22,
-          depth: 0.01
-        }, scene);
-        blade.parent = linkRoot;
-        blade.position.y = 0.12; 
-        blade.rotation.z = (b * Math.PI) / 2;
-        blade.rotation.y = Math.PI / 8; // Slit angle pitch
+        // B. ROTATING COOLING FANS
+        const fanBladesArray: any[] = [];
+        const fanSides = [0.81, -0.81];
+        fanSides.forEach((zSide, fIdx) => {
+          // Fan Shroud Outer casing Ring
+          const fanHous = MeshBuilder.CreateCylinder(`coolingFanHousing_${fIdx}`, {
+            diameter: 0.6,
+            height: 0.06,
+            tessellation: 16
+          }, scene);
+          fanHous.parent = carriageRoot;
+          fanHous.position.set(0, 0.75, zSide);
+          fanHous.rotation.x = Math.PI / 2;
+          fanHous.material = columnPowerMat;
+
+          // Center spinning blade hub spinner
+          const bladeHub = MeshBuilder.CreateCylinder(`bladeHub_${fIdx}`, {
+            diameter: 0.15,
+            height: 0.08,
+            tessellation: 8
+          }, scene);
+          bladeHub.parent = carriageRoot;
+          bladeHub.position.set(0, 0.75, zSide * 1.05);
+          bladeHub.rotation.x = Math.PI / 2;
+          bladeHub.material = shieldPlateMat;
+
+          // 4 interior mechanical fan blades
+          const linkRoot = new TransformNode(`fanLinkRoot_${fIdx}`, scene);
+          linkRoot.parent = carriageRoot;
+          linkRoot.position.set(0, 0.75, zSide * 1.05);
+          linkRoot.rotation.z = 0; // Rotates real-time in the animation loop!
+
+          for (let b = 0; b < 4; b++) {
+            const blade = MeshBuilder.CreateBox(`fanBlade_${fIdx}_${b}`, {
+              width: 0.06,
+              height: 0.22,
+              depth: 0.01
+            }, scene);
+            blade.parent = linkRoot;
+            blade.position.y = 0.12; 
+            blade.rotation.z = (b * Math.PI) / 2;
+            blade.rotation.y = Math.PI / 8; // Slit angle pitch
+            
+            const darkMetalMat = new StandardMaterial("darkMetalMat", scene);
+            darkMetalMat.diffuseColor = new Color3(0.08, 0.08, 0.09);
+            blade.material = darkMetalMat;
+          }
+          fanBladesArray.push(linkRoot);
+        });
+        fanBladesRef.current = fanBladesArray;
+
+        // C. STEAM-VENT VALVE EXHAUST PIPES
+        const exhaustMat = new StandardMaterial("exhaustMat", scene);
+        exhaustMat.diffuseColor = new Color3(0.12, 0.12, 0.15);
+        exhaustMat.specularColor = new Color3(0.4, 0.4, 0.4);
+
+        const pipeLeft = MeshBuilder.CreateCylinder("exhaustLeft", { diameter: 0.12, height: 0.4, tessellation: 8 }, scene);
+        pipeLeft.parent = carriageRoot;
+        pipeLeft.position.set(-1.6, 1.6, 0.45);
+        pipeLeft.rotation.z = -Math.PI / 8; // Angled back exhaust pipes
+        pipeLeft.material = exhaustMat;
+
+        const pipeRight = MeshBuilder.CreateCylinder("exhaustRight", { diameter: 0.12, height: 0.4, tessellation: 8 }, scene);
+        pipeRight.parent = carriageRoot;
+        pipeRight.position.set(-1.6, 1.6, -0.45);
+        pipeRight.rotation.z = -Math.PI / 8;
+        pipeRight.material = exhaustMat;
+
+        // Heavy reinforced Side armor plates
+        const plateL = MeshBuilder.CreateBox("plateL", { width: 3.9, height: 0.6, depth: 0.15 }, scene);
+        plateL.parent = carriageRoot;
+        plateL.position.set(0, 0.4, 0.81);
+        const plateR = MeshBuilder.CreateBox("plateR", { width: 3.9, height: 0.6, depth: 0.15 }, scene);
+        plateR.parent = carriageRoot;
+        plateR.position.set(0, 0.4, -0.81);
         
-        const darkMetalMat = new StandardMaterial("darkMetalMat", scene);
-        darkMetalMat.diffuseColor = new Color3(0.08, 0.08, 0.09);
-        blade.material = darkMetalMat;
+        plateL.material = shieldPlateMat;
+        plateR.material = shieldPlateMat;
+
+        // Cylinder wheels
+        const wheelPositions = [
+          { x: -1.5, z: 0.7 },
+          { x: 1.5, z: 0.7 },
+          { x: -1.5, z: -0.7 },
+          { x: 1.5, z: -0.7 }
+        ];
+        wheelPositions.forEach((pos, idx) => {
+          const wheel = MeshBuilder.CreateCylinder("wheel-" + idx, {
+            diameter: 0.48,
+            height: 0.15,
+            tessellation: 16
+          }, scene);
+          wheel.parent = carriageRoot;
+          wheel.position.set(pos.x, -0.4, pos.z);
+          wheel.rotation.x = Math.PI / 2;
+          
+          const wheelMat = new StandardMaterial("steelWheelMat", scene);
+          wheelMat.diffuseColor = new Color3(0.3, 0.3, 0.35);
+          wheelMat.specularColor = new Color3(0.7, 0.7, 0.7);
+          wheelMat.roughness = 0.15;
+          wheel.material = wheelMat;
+        });
+      } else {
+        // Instantiate the pre-loaded Stealth Infiltrator X2-A
+        const infiltrator = glbLoaderService.instantiateModel(scene, "cst-ert-stealth-infiltrator-x2-a.glb", carriageRoot);
+        infiltrator.position.set(0, 0.05, 0);
+        infiltrator.scaling.set(1.5, 1.5, 1.5);
+
+        // High-Tech Internal Stealth Vector Core (visible only during Exploded View)
+        const coreDiag = MeshBuilder.CreateBox("internalCoreDiagBox", { width: 0.6, height: 0.4, depth: 1.1 }, scene);
+        coreDiag.parent = carriageRoot;
+        coreDiag.position.set(0, 0.15, -0.2);
+        const coreDiagMat = new StandardMaterial("internalCoreDiagBoxMat", scene);
+        coreDiagMat.diffuseColor = new Color3(0.4, 0.05, 0.95);
+        coreDiagMat.emissiveColor = new Color3(0.65, 0.2, 1.0);
+        coreDiagMat.wireframe = true;
+        coreDiag.material = coreDiagMat;
+        coreDiag.visibility = 0;
+
+        const coreReactor = MeshBuilder.CreateSphere("internalCoreReactorSphere", { diameter: 0.26 }, scene);
+        coreReactor.parent = carriageRoot;
+        coreReactor.position.set(0, 0.15, -0.2);
+        const coreReactorMat = new StandardMaterial("internalCoreReactorMat", scene);
+        coreReactorMat.emissiveColor = new Color3(1.0, 0.35, 0.0); // Amber thruster plasma core
+        coreReactorMat.disableLighting = true;
+        coreReactor.material = coreReactorMat;
+        coreReactor.visibility = 0;
       }
-      fanBladesArray.push(linkRoot);
-    });
-    fanBladesRef.current = fanBladesArray;
+    };
 
-    // C. STEAM-VENT VALVE EXHAUST PIPES
-    const exhaustMat = new StandardMaterial("exhaustMat", scene);
-    exhaustMat.diffuseColor = new Color3(0.12, 0.12, 0.15);
-    exhaustMat.specularColor = new Color3(0.4, 0.4, 0.4);
-
-    const pipeLeft = MeshBuilder.CreateCylinder("exhaustLeft", { diameter: 0.12, height: 0.4, tessellation: 8 }, scene);
-    pipeLeft.parent = carriageRoot;
-    pipeLeft.position.set(-1.6, 1.6, 0.45);
-    pipeLeft.rotation.z = -Math.PI / 8; // Angled back exhaust pipes
-    pipeLeft.material = exhaustMat;
-
-    const pipeRight = MeshBuilder.CreateCylinder("exhaustRight", { diameter: 0.12, height: 0.4, tessellation: 8 }, scene);
-    pipeRight.parent = carriageRoot;
-    pipeRight.position.set(-1.6, 1.6, -0.45);
-    pipeRight.rotation.z = -Math.PI / 8;
-    pipeRight.material = exhaustMat;
-
-    // Heavy reinforced Side armor plates
-    const plateL = MeshBuilder.CreateBox("plateL", { width: 3.9, height: 0.6, depth: 0.15 }, scene);
-    plateL.parent = carriageRoot;
-    plateL.position.set(0, 0.4, 0.81);
-    const plateR = MeshBuilder.CreateBox("plateR", { width: 3.9, height: 0.6, depth: 0.15 }, scene);
-    plateR.parent = carriageRoot;
-    plateR.position.set(0, 0.4, -0.81);
-    
-    plateL.material = shieldPlateMat;
-    plateR.material = shieldPlateMat;
-
-    // Cylinder wheels
-    const wheelPositions = [
-      { x: -1.5, z: 0.7 },
-      { x: 1.5, z: 0.7 },
-      { x: -1.5, z: -0.7 },
-      { x: 1.5, z: -0.7 }
-    ];
-    wheelPositions.forEach((pos, idx) => {
-      const wheel = MeshBuilder.CreateCylinder("wheel-" + idx, {
-        diameter: 0.48,
-        height: 0.15,
-        tessellation: 16
-      }, scene);
-      wheel.parent = carriageRoot;
-      wheel.position.set(pos.x, -0.4, pos.z);
-      wheel.rotation.x = Math.PI / 2;
-      
-      const wheelMat = new StandardMaterial("steelWheelMat", scene);
-      wheelMat.diffuseColor = new Color3(0.3, 0.3, 0.35);
-      wheelMat.specularColor = new Color3(0.7, 0.7, 0.7);
-      wheelMat.roughness = 0.15;
-      wheel.material = wheelMat;
-    });
+    buildCockpitMesh();
+    (window as any).__rebuildCockpitMesh = buildCockpitMesh;
 
     // Hologram Floating HUD Card
     const holoPlane = MeshBuilder.CreatePlane("diagnosticHoloCard", {
@@ -1628,7 +1908,11 @@ export const RepairBay3D: React.FC<Props> = ({
       ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
       ctx.font = "10px 'JetBrains Mono', Courier, monospace";
       
-      ctx.fillText("CARGO SYSTEM  : Genesis Rift Escort Array [V-IX]", 30, 110);
+      if (cockpitModelRef.current === 'infiltrator') {
+        ctx.fillText("CARGO SYSTEM  : Stealth Infiltrator X2-A [PRELOADED GLB]", 30, 110);
+      } else {
+        ctx.fillText("CARGO SYSTEM  : Genesis Rift Escort Array [V-IX]", 30, 110);
+      }
       ctx.fillText(`ORACLE SIGNALS: REF/${originalQuery.toUpperCase()}`, 30, 130);
       
       let statusString = "SCANNING SYSTEM TELEMETRY...";
@@ -1673,6 +1957,7 @@ export const RepairBay3D: React.FC<Props> = ({
 
     let angleAccumulator = 0;
     let weldBurstTimer = 0;
+    let explodedLerp = 0.0;
 
     const mainLoop = () => {
       const now = performance.now();
@@ -1736,6 +2021,144 @@ export const RepairBay3D: React.FC<Props> = ({
             life: 1.0,
             size: 0.1
           });
+        }
+
+        // 3. EXPLODED VIEW COMPONENT DISPLACEMENT & DIAGNOSTIC INTERNALS
+        if (isExplodedViewRef.current) {
+          explodedLerp = Math.min(1.0, explodedLerp + 0.045);
+        } else {
+          explodedLerp = Math.max(0.0, explodedLerp - 0.045);
+        }
+
+        if (cockpitModelRef.current === 'train') {
+          const chassis = scene.getMeshByName("carChassis");
+          if (chassis) chassis.position.y = -0.15 - explodedLerp * 0.7;
+
+          const plateL = scene.getMeshByName("plateL");
+          if (plateL) plateL.position.z = 0.81 + explodedLerp * 0.9;
+
+          const plateR = scene.getMeshByName("plateR");
+          if (plateR) plateR.position.z = -0.81 - explodedLerp * 0.9;
+
+          const roofShield1 = scene.getMeshByName("roofShieldAngleL");
+          if (roofShield1) {
+            roofShield1.position.y = 1.55 + explodedLerp * 0.8;
+            roofShield1.position.x = -0.8 - explodedLerp * 0.4;
+          }
+
+          const roofShield2 = scene.getMeshByName("roofShieldAngleR");
+          if (roofShield2) {
+            roofShield2.position.y = 1.55 + explodedLerp * 0.8;
+            roofShield2.position.x = 0.8 + explodedLerp * 0.4;
+          }
+
+          const pipeLeft = scene.getMeshByName("exhaustLeft");
+          if (pipeLeft) {
+            pipeLeft.position.y = 1.6 + explodedLerp * 0.6;
+            pipeLeft.position.x = -1.6 - explodedLerp * 0.3;
+          }
+
+          const pipeRight = scene.getMeshByName("exhaustRight");
+          if (pipeRight) {
+            pipeRight.position.y = 1.6 + explodedLerp * 0.6;
+            pipeRight.position.x = -1.6 - explodedLerp * 0.3;
+          }
+
+          const wheel0 = scene.getMeshByName("wheel-0");
+          if (wheel0) wheel0.position.set(-1.5 - explodedLerp * 0.5, -0.4 - explodedLerp * 0.3, 0.7 + explodedLerp * 0.4);
+          const wheel1 = scene.getMeshByName("wheel-1");
+          if (wheel1) wheel1.position.set(1.5 + explodedLerp * 0.5, -0.4 - explodedLerp * 0.3, 0.7 + explodedLerp * 0.4);
+          const wheel2 = scene.getMeshByName("wheel-2");
+          if (wheel2) wheel2.position.set(-1.5 - explodedLerp * 0.5, -0.4 - explodedLerp * 0.3, -0.7 - explodedLerp * 0.4);
+          const wheel3 = scene.getMeshByName("wheel-3");
+          if (wheel3) wheel3.position.set(1.5 + explodedLerp * 0.5, -0.4 - explodedLerp * 0.3, -0.7 - explodedLerp * 0.4);
+
+          const fanHous0 = scene.getMeshByName("coolingFanHousing_0");
+          if (fanHous0) fanHous0.position.z = 0.81 + explodedLerp * 0.8;
+          const bladeHub0 = scene.getMeshByName("bladeHub_0");
+          if (bladeHub0) bladeHub0.position.z = 0.81 * 1.05 + explodedLerp * 0.8;
+          const fanLink0 = scene.getTransformNodeByName("fanLinkRoot_0");
+          if (fanLink0) fanLink0.position.z = 0.81 * 1.05 + explodedLerp * 0.8;
+
+          const fanHous1 = scene.getMeshByName("coolingFanHousing_1");
+          if (fanHous1) fanHous1.position.z = -0.81 - explodedLerp * 0.8;
+          const bladeHub1 = scene.getMeshByName("bladeHub_1");
+          if (bladeHub1) bladeHub1.position.z = -0.81 * 1.05 - explodedLerp * 0.8;
+          const fanLink1 = scene.getTransformNodeByName("fanLinkRoot_1");
+          if (fanLink1) fanLink1.position.z = -0.81 * 1.05 - explodedLerp * 0.8;
+        } else {
+          const leftWing = scene.getMeshByName("stealthLeftWing");
+          if (leftWing) leftWing.position.x = -0.6 - explodedLerp * 0.8;
+
+          const rightWing = scene.getMeshByName("stealthRightWing");
+          if (rightWing) rightWing.position.x = 0.6 + explodedLerp * 0.8;
+
+          const leftWinglet = scene.getMeshByName("stealthLeftWinglet");
+          if (leftWinglet) leftWinglet.position.x = -0.5 - explodedLerp * 0.4;
+
+          const rightWinglet = scene.getMeshByName("stealthRightWinglet");
+          if (rightWinglet) rightWinglet.position.x = 0.5 + explodedLerp * 0.4;
+
+          const canopy = scene.getMeshByName("stealthCanopy");
+          if (canopy) {
+            canopy.position.y = 0.25 + explodedLerp * 0.8;
+            canopy.position.z = 0.1 + explodedLerp * 0.4;
+          }
+
+          const intakeLeft = scene.getMeshByName("airIntake_-1");
+          if (intakeLeft) intakeLeft.position.x = -0.18 - explodedLerp * 0.4;
+
+          const intakeRight = scene.getMeshByName("airIntake_1");
+          if (intakeRight) intakeRight.position.x = 0.18 + explodedLerp * 0.4;
+
+          const engineLeft = scene.getMeshByName("thrusterEngine_-1");
+          if (engineLeft) {
+            engineLeft.position.z = -0.7 - explodedLerp * 0.8;
+            engineLeft.position.x = -0.14 - explodedLerp * 0.3;
+          }
+
+          const engineRight = scene.getMeshByName("thrusterEngine_1");
+          if (engineRight) {
+            engineRight.position.z = -0.7 - explodedLerp * 0.8;
+            engineRight.position.x = 0.14 + explodedLerp * 0.3;
+          }
+
+          const sensorNeedle = scene.getMeshByName("sensorNeedle");
+          if (sensorNeedle) sensorNeedle.position.z = 0.85 + explodedLerp * 0.9;
+
+          // Support generic GLB model children displacement as a fallback
+          const glbRoot = scene.getTransformNodeByName("glb_root_cst-ert-stealth-infiltrator-x2-a.glb");
+          if (glbRoot) {
+            glbRoot.getChildMeshes().forEach((mesh) => {
+              if (mesh.name !== "internalCoreDiagBox" && mesh.name !== "internalCoreReactorSphere") {
+                if (!mesh.metadata?.defaultPosition) {
+                  if (!mesh.metadata) mesh.metadata = {};
+                  mesh.metadata.defaultPosition = mesh.position.clone();
+                }
+                const defPos = mesh.metadata.defaultPosition;
+                const dir = defPos.normalizeToNew();
+                mesh.position.set(
+                  defPos.x + dir.x * explodedLerp * 0.8,
+                  defPos.y + dir.y * explodedLerp * 0.8,
+                  defPos.z + dir.z * explodedLerp * 0.8
+                );
+              }
+            });
+          }
+        }
+
+        // Animate high-tech core overlay visibility and pulse
+        const coreBox = scene.getMeshByName("internalCoreDiagBox");
+        const coreSphere = scene.getMeshByName("internalCoreReactorSphere");
+        if (coreBox) {
+          coreBox.visibility = explodedLerp;
+          coreBox.rotation.y = now / 1200;
+          coreBox.rotation.x = now / 1800;
+        }
+        if (coreSphere) {
+          coreSphere.visibility = explodedLerp;
+          const scalePulse = 1.0 + Math.sin(now / 150) * 0.12;
+          coreSphere.scaling.set(scalePulse, scalePulse, scalePulse);
         }
       }
 
@@ -1943,6 +2366,10 @@ export const RepairBay3D: React.FC<Props> = ({
       });
 
       if (camera) {
+        if (isAutoOrbitOnRef.current) {
+          camera.alpha += 0.0035;
+        }
+
         if (isCoaxialBurstActiveRef.current) {
           const shake = 0.09;
           camera.target.x = 0 + (Math.random() - 0.5) * shake;
@@ -2420,6 +2847,235 @@ export const RepairBay3D: React.FC<Props> = ({
                 <div className="absolute w-24 h-24 border border-teal-500/10 rounded-full animate-pulse" />
                 <div className="absolute w-48 h-48 border border-teal-500/5 rounded-full" />
               </div>
+
+              {/* Floating Camera Interactive HUD Controls */}
+              <div className="absolute bottom-3 left-3 z-20 flex flex-col gap-1.5 p-2 bg-black/85 backdrop-blur-sm border border-zinc-800 rounded-sm shadow-[0_4px_24px_rgba(0,0,0,0.8)] text-zinc-300 w-[150px] font-mono pointer-events-auto">
+                <div className="flex items-center justify-between text-[7px] font-black tracking-widest text-zinc-500 uppercase pb-1 border-b border-zinc-800">
+                  <span>🛰️ CAM COCKPIT</span>
+                  <span className={`w-1.5 h-1.5 rounded-full ${isAutoOrbitOn ? "bg-purple-400 animate-pulse" : "bg-zinc-650"}`} />
+                </div>
+
+                {/* Auto Orbit Toggle */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAutoOrbitOn(!isAutoOrbitOn);
+                    addLog(`CAM CONTROLS // AUTO ORBIT SYSTEM: [${!isAutoOrbitOn ? "ENGAGED" : "SUSPENDED"}]`);
+                  }}
+                  className={`w-full py-1 px-1.5 text-[7px] font-black uppercase border rounded-sm flex items-center justify-center gap-1 transition-all cursor-pointer ${
+                    isAutoOrbitOn
+                      ? "bg-purple-950/40 border-purple-500/60 text-purple-300 shadow-[0_0_8px_rgba(168,85,247,0.15)]"
+                      : "bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 text-zinc-400 hover:text-zinc-200"
+                  }`}
+                  title="Toggle continuous camera rotation around chassis"
+                >
+                  <RotateCw size={8} className={isAutoOrbitOn ? "animate-spin" : ""} />
+                  <span>{isAutoOrbitOn ? "AUTO-ORBIT: ON" : "AUTO-ORBIT: OFF"}</span>
+                </button>
+
+                {/* Exploded View Toggle */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsExplodedView(!isExplodedView);
+                    addLog(`STRUCT DIAG // EXPLODED STRUCTURAL MATRIX: [${!isExplodedView ? "EXPANDED FOR INSPECTION" : "COLLAPSED TO NOMINAL"}]`);
+                  }}
+                  className={`w-full py-1 px-1.5 text-[7px] font-black uppercase border rounded-sm flex items-center justify-center gap-1 transition-all cursor-pointer ${
+                    isExplodedView
+                      ? "bg-cyan-950/40 border-cyan-500/60 text-cyan-300 shadow-[0_0_8px_rgba(6,182,212,0.15)]"
+                      : "bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 text-zinc-400 hover:text-zinc-200"
+                  }`}
+                  title="Toggle Exploded View to inspect internal components and power core structures"
+                >
+                  <Wrench size={8} className={isExplodedView ? "animate-pulse text-cyan-400" : ""} />
+                  <span>{isExplodedView ? "EXPLODED: ON" : "EXPLODED: OFF"}</span>
+                </button>
+
+                {/* Directional Pad */}
+                <div className="flex flex-col items-center gap-1 my-0.5">
+                  <div className="text-[6.5px] font-bold text-zinc-500 uppercase tracking-wider">// ORBIT ANGLE</div>
+                  
+                  {/* Up button */}
+                  <button
+                    type="button"
+                    onClick={handleOrbitUp}
+                    className="p-1 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 rounded-sm text-zinc-400 hover:text-cyan-300 cursor-pointer transition-all active:scale-95"
+                    title="Tilt Camera Up"
+                  >
+                    <ChevronUp size={10} />
+                  </button>
+
+                  {/* Left & Right row */}
+                  <div className="flex items-center gap-2 w-full justify-between px-1">
+                    <button
+                      type="button"
+                      onClick={handleOrbitLeft}
+                      className="p-1 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 rounded-sm text-zinc-400 hover:text-cyan-300 cursor-pointer transition-all active:scale-95"
+                      title="Orbit Left"
+                    >
+                      <ChevronLeft size={10} />
+                    </button>
+                    
+                    <button
+                      type="button"
+                      onClick={handleResetCamera}
+                      className="px-1.5 py-1 bg-zinc-950 hover:bg-cyan-950/30 border border-zinc-800 hover:border-cyan-800 text-[6.5px] font-black uppercase text-zinc-400 hover:text-cyan-400 rounded-sm cursor-pointer transition-all active:scale-95"
+                      title="Reset Camera view to default"
+                    >
+                      RESET
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleOrbitRight}
+                      className="p-1 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 rounded-sm text-zinc-400 hover:text-cyan-300 cursor-pointer transition-all active:scale-95"
+                      title="Orbit Right"
+                    >
+                      <ChevronRight size={10} />
+                    </button>
+                  </div>
+
+                  {/* Down button */}
+                  <button
+                    type="button"
+                    onClick={handleOrbitDown}
+                    className="p-1 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 rounded-sm text-zinc-400 hover:text-cyan-300 cursor-pointer transition-all active:scale-95"
+                    title="Tilt Camera Down"
+                  >
+                    <ChevronDown size={10} />
+                  </button>
+                </div>
+
+                {/* Zoom block */}
+                <div className="flex flex-col gap-1 border-t border-zinc-800 pt-1.5">
+                  <div className="text-[6.5px] font-bold text-zinc-550 uppercase tracking-wider text-center">// LENS APERTURE</div>
+                  <div className="flex gap-1">
+                    <button
+                      type="button"
+                      onClick={handleZoomIn}
+                      className="flex-1 py-1 px-1 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 rounded-sm flex items-center justify-center gap-1 text-zinc-400 hover:text-cyan-300 cursor-pointer transition-all active:scale-95"
+                      title="Zoom In"
+                    >
+                      <ZoomIn size={9} />
+                      <span className="text-[6.5px] font-bold uppercase">ZOOM +</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleZoomOut}
+                      className="flex-1 py-1 px-1 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 rounded-sm flex items-center justify-center gap-1 text-zinc-400 hover:text-cyan-300 cursor-pointer transition-all active:scale-95"
+                      title="Zoom Out"
+                    >
+                      <ZoomOut size={9} />
+                      <span className="text-[6.5px] font-bold uppercase">ZOOM -</span>
+                    </button>
+                  </div>
+
+                  {/* Dedicated full-width Reset View button */}
+                  <button
+                    type="button"
+                    onClick={handleResetCamera}
+                    className="w-full mt-1.5 py-1 px-1.5 bg-cyan-950/20 hover:bg-cyan-900/30 border border-cyan-900/60 hover:border-cyan-500/80 rounded-sm flex items-center justify-center gap-1.5 text-cyan-400 hover:text-cyan-300 cursor-pointer transition-all active:scale-95 text-[7px] font-black uppercase font-mono"
+                    title="Reset camera orbit and zoom controls to default starting viewport"
+                  >
+                    <RefreshCw size={8} />
+                    <span>RESET VIEWPORT</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Floating Caliper Measurement HUD Panel */}
+              <div className="absolute bottom-3 right-3 z-20 flex flex-col gap-1.5 p-2 bg-black/85 backdrop-blur-sm border border-zinc-800 rounded-sm shadow-[0_4px_24px_rgba(0,0,0,0.8)] text-zinc-300 w-[165px] font-mono pointer-events-auto select-none">
+                <div className="flex items-center justify-between text-[7px] font-black tracking-widest text-zinc-500 uppercase pb-1 border-b border-zinc-800">
+                  <span>📐 SURFACE CALIPER</span>
+                  <span className={`w-1.5 h-1.5 rounded-full ${isMeasureMode ? "bg-cyan-400 animate-pulse" : "bg-zinc-650"}`} />
+                </div>
+
+                {/* Mode toggle */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMeasureMode(!isMeasureMode);
+                    addLog(`CALIPER SYSTEM // MEASUREMENT MODE: [${!isMeasureMode ? "ENABLED - CLICK MODEL TO MEASURE" : "DISABLED"}]`);
+                  }}
+                  className={`w-full py-1 px-1.5 text-[7px] font-black uppercase border rounded-sm flex items-center justify-center gap-1 transition-all cursor-pointer ${
+                    isMeasureMode
+                      ? "bg-cyan-950/40 border-cyan-500/60 text-cyan-300 shadow-[0_0_8px_rgba(6,182,212,0.15)]"
+                      : "bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 text-zinc-400 hover:text-zinc-200"
+                  }`}
+                  title="Toggle Measurement Mode. When enabled, click two points on the model to calculate 3D distance."
+                >
+                  <Compass size={8} className={isMeasureMode ? "animate-spin text-cyan-400" : ""} />
+                  <span>{isMeasureMode ? "MEASURE MODE: ON" : "MEASURE MODE: OFF"}</span>
+                </button>
+
+                {/* Coordinates & Instructions */}
+                <div className="flex flex-col gap-1 text-[6.5px] leading-tight text-zinc-400 bg-zinc-950/50 p-1 border border-zinc-900 rounded-sm">
+                  {isMeasureMode ? (
+                    <div className="text-cyan-400/90 text-center font-bold animate-pulse py-0.5 border-b border-zinc-900 mb-1">
+                      🎯 CLICK SURFACE TO PICK
+                    </div>
+                  ) : (
+                    <div className="text-zinc-500 text-center py-0.5 border-b border-zinc-900 mb-1">
+                      STANDBY FOR SIGNAL
+                    </div>
+                  )}
+                  
+                  <div className="flex justify-between">
+                    <span className="text-zinc-500">POINT A:</span>
+                    <span className={measurePoints.p1 ? "text-cyan-400" : "text-zinc-600"}>
+                      {measurePoints.p1 
+                        ? `${measurePoints.p1.x.toFixed(1)}, ${measurePoints.p1.y.toFixed(1)}, ${measurePoints.p1.z.toFixed(1)}`
+                        : "NOT LOCKED"}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between">
+                    <span className="text-zinc-500">POINT B:</span>
+                    <span className={measurePoints.p2 ? "text-pink-400" : "text-zinc-600"}>
+                      {measurePoints.p2 
+                        ? `${measurePoints.p2.x.toFixed(1)}, ${measurePoints.p2.y.toFixed(1)}, ${measurePoints.p2.z.toFixed(1)}`
+                        : "NOT LOCKED"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Computed Distance Output block */}
+                <div className="flex flex-col gap-0.5 border-t border-zinc-800 pt-1">
+                  <div className="text-[6px] font-bold text-zinc-550 uppercase tracking-wider text-center">// ESTIMATED SPAN</div>
+                  <div className="flex items-center justify-center py-1 bg-cyan-950/20 border border-cyan-950 rounded-sm">
+                    {measureDistance !== null ? (
+                      <div className="flex flex-col items-center">
+                        <span className="text-xs font-black text-cyan-300 tracking-wider">
+                          {measureDistance.toFixed(2)} AU
+                        </span>
+                        <span className="text-[5px] text-zinc-500 uppercase tracking-widest mt-0.5">
+                          Abyssum Units
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-[7px] text-zinc-600 uppercase tracking-widest font-bold">
+                        -- AU
+                      </span>
+                    )}
+                  </div>
+                  
+                  {/* Clear Measurement Button */}
+                  <button
+                    type="button"
+                    onClick={handleClearMeasurement}
+                    disabled={!measurePoints.p1 && !measurePoints.p2}
+                    className={`w-full mt-1 py-1 px-1 rounded-sm flex items-center justify-center gap-1.5 transition-all text-[6.5px] font-bold uppercase ${
+                      measurePoints.p1 || measurePoints.p2
+                        ? "bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 text-zinc-300 hover:text-white cursor-pointer active:scale-95"
+                        : "bg-zinc-950 border border-zinc-950 text-zinc-650 cursor-not-allowed"
+                    }`}
+                    title="Clear current surface measurement and visual anchors"
+                  >
+                    <RefreshCw size={7} />
+                    <span>CLEAR ANCHORS</span>
+                  </button>
+                </div>
+              </div>
             </div>
 
             {/* Interactive Control Deck (Guttered directly at the bottom in the hologram housing) */}
@@ -2480,6 +3136,54 @@ export const RepairBay3D: React.FC<Props> = ({
 
               {/* Direct Weld Deployers */}
               <div className="w-full md:w-auto shrink-0 flex items-center justify-end gap-2.5">
+                {/* Dynamic 3D Model Sleeve Switcher */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const nextModel = cockpitModel === 'train' ? 'infiltrator' : 'train';
+                    setCockpitModel(nextModel);
+                    addLog(`GLB SYSTEM // SWITCHING ACTIVE CHASSIS SCHEMATIC TO: [${nextModel.toUpperCase()}]`);
+                    
+                    // Trigger dynamic rebuild of the cockpit 3D meshes
+                    if (typeof (window as any).__rebuildCockpitMesh === 'function') {
+                      setTimeout(() => {
+                        (window as any).__rebuildCockpitMesh();
+                      }, 10);
+                    }
+                  }}
+                  className={`py-1.5 px-3 font-mono text-[8.5px] font-black uppercase tracking-widest rounded-sm flex items-center justify-center gap-1 transition-all active:scale-98 cursor-pointer ${
+                    cockpitModel === 'infiltrator'
+                      ? "bg-purple-950/40 border border-purple-500/60 text-purple-300 shadow-[0_0_12px_rgba(168,85,247,0.25)]"
+                      : "bg-zinc-900 hover:bg-zinc-850 border border-zinc-700 text-zinc-350"
+                  }`}
+                  title="Switch between the heavy Freight Cargo Chassis and the high-fidelity preloaded Stealth Infiltrator X2-A model"
+                >
+                  <Layers size={10} className={cockpitModel === 'infiltrator' ? "animate-pulse text-purple-400" : "text-zinc-500"} />
+                  <span>
+                    {cockpitModel === 'infiltrator' ? "🛰️ STEALTH INFILTRATOR" : "🛰️ DEF CARGO ARRAY"}
+                  </span>
+                </button>
+
+                {/* Exploded View Toggle */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsExplodedView(!isExplodedView);
+                    addLog(`STRUCT DIAG // EXPLODED STRUCTURAL MATRIX: [${!isExplodedView ? "EXPANDED FOR INSPECTION" : "COLLAPSED TO NOMINAL"}]`);
+                  }}
+                  className={`py-1.5 px-3 font-mono text-[8.5px] font-black uppercase tracking-widest rounded-sm flex items-center justify-center gap-1.5 transition-all active:scale-98 cursor-pointer ${
+                    isExplodedView
+                      ? "bg-cyan-950/40 border border-cyan-500/60 text-cyan-300 shadow-[0_0_12px_rgba(6,182,212,0.25)]"
+                      : "bg-zinc-900 hover:bg-zinc-850 border border-zinc-700 text-zinc-350"
+                  }`}
+                  title="Toggle Exploded View to inspect internal components and power core structures"
+                >
+                  <Wrench size={10} className={isExplodedView ? "animate-pulse text-cyan-400" : "text-zinc-500"} />
+                  <span>
+                    {isExplodedView ? "💥 EXPLODED: ON" : "💥 EXPLODED VIEW"}
+                  </span>
+                </button>
+
                 {/* Custom Coaxial Lance Forge trigger */}
                 <button
                   onClick={() => setIsLanceModalOpen(true)}
