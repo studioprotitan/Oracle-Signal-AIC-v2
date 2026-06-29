@@ -21,10 +21,165 @@ import {
   Play, Pause, RefreshCw, Layers, Shield, Wrench, AlertTriangle, 
   Heart, Activity, Gauge, Navigation, Compass, User, Zap, Database, 
   Wallet, CreditCard, Flame, Skull, ShieldCheck, Check, Server,
-  ZoomIn, ZoomOut, RotateCw, Maximize2, ChevronUp, ChevronDown, ChevronLeft, ChevronRight
+  ZoomIn, ZoomOut, RotateCw, Maximize2, ChevronUp, ChevronDown, ChevronLeft, ChevronRight,
+  Info, X
 } from 'lucide-react';
 import { RiftIncursionScanner } from './RiftIncursionScanner';
 import { glbLoaderService } from '../services/glbLoaderService';
+
+export interface ComponentStructureData {
+  id: string;
+  name: string;
+  material: string;
+  integrity: number;
+  status: 'Stable' | 'Degraded';
+  notes: string;
+  resonance: string;
+  meshNamePattern: string;
+}
+
+export const MODEL_COMPONENTS_DATA: ComponentStructureData[] = [
+  {
+    id: 'fuselage',
+    name: 'Stealth Fuselage Chassis',
+    material: 'Carbon-Composite Titanium Matrix',
+    integrity: 98,
+    status: 'Stable',
+    notes: 'Central fuselage engineered with multi-layered carbon fiber and uncataloged titanium matrix. Demonstrates zero structural fatigue.',
+    resonance: '14.2 Hz (Damped)',
+    meshNamePattern: 'stealthFuselage'
+  },
+  {
+    id: 'canopy',
+    name: 'Canopy Shield & Sensor Array',
+    material: 'Coaxial Blue Laser Glass Polymer',
+    integrity: 74,
+    status: 'Degraded',
+    notes: 'Cockpit glass with integrated blue quantum sensory receiver. Micro-meteoroid impacts detected. Refraction efficiency degraded by 8.4%.',
+    resonance: '412.5 Hz (Excited)',
+    meshNamePattern: 'stealthCanopy'
+  },
+  {
+    id: 'left_wing',
+    name: 'Left Swept Wing',
+    material: 'Aero-Carbon Composite Plating',
+    integrity: 94,
+    status: 'Stable',
+    notes: 'Swept wing housing hydraulic steering stabilizers. Airfoil and leading edges are completely intact. Stress loads nominal.',
+    resonance: '84.8 Hz',
+    meshNamePattern: 'stealthLeftWing'
+  },
+  {
+    id: 'left_winglet',
+    name: 'Left Wing Stabilizer Trim',
+    material: 'Mag-Gold Core Alloy',
+    integrity: 92,
+    status: 'Stable',
+    notes: 'Wingtip stabilizer with gold alloy trim that acts as a magnetic field sink. Flux levels stabilized.',
+    resonance: '124.0 Hz',
+    meshNamePattern: 'stealthLeftWinglet'
+  },
+  {
+    id: 'right_wing',
+    name: 'Right Swept Wing',
+    material: 'Aero-Carbon Composite Plating',
+    integrity: 68,
+    status: 'Degraded',
+    notes: 'Right aerodynamic stabilizer plate. Ultrasonic scans detect interior hairline fractures along secondary stress-bearing spar.',
+    resonance: '102.4 Hz (Unstable)',
+    meshNamePattern: 'stealthRightWing'
+  },
+  {
+    id: 'right_winglet',
+    name: 'Right Wing Stabilizer Trim',
+    material: 'Mag-Gold Core Alloy',
+    integrity: 95,
+    status: 'Stable',
+    notes: 'Starboard wingtip gold stabilizer trim. Boundary condition interfaces are nominal.',
+    resonance: '124.0 Hz',
+    meshNamePattern: 'stealthRightWinglet'
+  },
+  {
+    id: 'left_intake',
+    name: 'Left Engine Air Intake',
+    material: 'Thermal Absorption Ceramic Alloy',
+    integrity: 96,
+    status: 'Stable',
+    notes: 'High-speed cooling intake scoop. Filters free of space dust. Flow parameters optimized.',
+    resonance: '220.5 Hz',
+    meshNamePattern: 'airIntake_-1'
+  },
+  {
+    id: 'right_intake',
+    name: 'Right Engine Air Intake',
+    material: 'Thermal Absorption Ceramic Alloy',
+    integrity: 97,
+    status: 'Stable',
+    notes: 'Starboard cooling intake scoop. Aerodynamic flow matches port counterpart.',
+    resonance: '220.5 Hz',
+    meshNamePattern: 'airIntake_1'
+  },
+  {
+    id: 'left_engine',
+    name: 'Left Vector Plasma Thruster',
+    material: 'Single-Crystal Superalloy SC-16',
+    integrity: 91,
+    status: 'Stable',
+    notes: 'Port-side main engine. High-temperature ceramic casing shows zero fatigue. Pressure chambers are clear.',
+    resonance: '1,850 Hz',
+    meshNamePattern: 'thrusterEngine_-1'
+  },
+  {
+    id: 'right_engine',
+    name: 'Right Vector Plasma Thruster',
+    material: 'Single-Crystal Superalloy SC-16',
+    integrity: 52,
+    status: 'Degraded',
+    notes: 'Starboard main nozzle. Dynamic thermal scans reveal localized erosion of the internal chamber throat lining. Immediate calibration advised.',
+    resonance: '1,720 Hz (Fluctuating)',
+    meshNamePattern: 'thrusterEngine_1'
+  },
+  {
+    id: 'sensor_needle',
+    name: 'Tactile Sensor Scan Needle',
+    material: 'Hyper-Conductive Gold-Ir Alloy',
+    integrity: 99,
+    status: 'Stable',
+    notes: 'Long-range scan receiver. Zero alignment drift. Quantum signal reception is fully aligned.',
+    resonance: '12.4 kHz',
+    meshNamePattern: 'sensorNeedle'
+  },
+  {
+    id: 'sensor_node',
+    name: 'Glowing Sensor Orb Node',
+    material: 'Coaxial Blue Refractive Glass',
+    integrity: 94,
+    status: 'Stable',
+    notes: 'Optical scanner sphere. Multi-spectral sensors firing at peak frequency. No dead pixels detected.',
+    resonance: '840.0 THz',
+    meshNamePattern: 'sensorNode'
+  },
+  {
+    id: 'internal_core',
+    name: 'Internal Stealth Vector Core',
+    material: 'Wireframe Abyssum Hypermatrix',
+    integrity: 90,
+    status: 'Stable',
+    notes: 'Core diagnostic mesh visible in Exploded View. Quantum coherence holds at 90.4%. Harmonic shielding active.',
+    resonance: '0.44 Hz (Rhythmic)',
+    meshNamePattern: 'internalCoreDiagBox'
+  },
+  {
+    id: 'plasma_reactor',
+    name: 'Amber Thruster Plasma Reactor',
+    material: 'Concentrated Thermoplastic Plasma',
+    integrity: 88,
+    status: 'Stable',
+    notes: 'Exhaust combustion core reactor. Plasma density stable at 1.44 Mega-Abyss/sec.',
+    resonance: '8.8 kHz',
+    meshNamePattern: 'internalCoreReactorSphere'
+  }
+];
 
 interface Props {
   addLog: (msg: string) => void;
@@ -163,6 +318,26 @@ export const RepairBay3D: React.FC<Props> = ({
   // Cockpit 3D model preloading and selection
   const [cockpitModel, setCockpitModel] = useState<'train' | 'infiltrator'>('train');
   const [isInfiltratorPreloaded, setIsInfiltratorPreloaded] = useState<boolean>(false);
+  const [selectedGlbPath, setSelectedGlbPath] = useState<string>("commander-antonio-coldstone-a.glb");
+  const selectedGlbPathRef = useRef<string>("commander-antonio-coldstone-a.glb");
+  const [availableAnimations, setAvailableAnimations] = useState<string[]>([]);
+  const [activeAnimationName, setActiveAnimationName] = useState<string | null>(null);
+
+  useEffect(() => {
+    selectedGlbPathRef.current = selectedGlbPath;
+    if (sceneRef.current) {
+      addLog(`GLB SYSTEM // INITIATING LOAD FOR SCHEMATIC: ${selectedGlbPath.toUpperCase()}`);
+      glbLoaderService.preLoadModel(sceneRef.current, selectedGlbPath).then((success) => {
+        setIsInfiltratorPreloaded(true);
+        addLog(`GLB SYSTEM // SCHEMATIC PRE-LOADED AND READY: ${selectedGlbPath.toUpperCase()}`);
+        if (cockpitModel === 'infiltrator' && typeof (window as any).__rebuildCockpitMesh === 'function') {
+          (window as any).__rebuildCockpitMesh();
+        }
+      }).catch(err => {
+        console.error("GLB SYSTEM // Preload failed:", err);
+      });
+    }
+  }, [selectedGlbPath, cockpitModel]);
   const cockpitModelRef = useRef<'train' | 'infiltrator'>('train');
   const [isExplodedView, setIsExplodedView] = useState<boolean>(false);
   const isExplodedViewRef = useRef<boolean>(false);
@@ -177,6 +352,10 @@ export const RepairBay3D: React.FC<Props> = ({
   const [measurePoints, setMeasurePoints] = useState<{ p1: Vector3 | null, p2: Vector3 | null }>({ p1: null, p2: null });
   const measurePointsRef = useRef<{ p1: Vector3 | null, p2: Vector3 | null }>({ p1: null, p2: null });
   const [measureDistance, setMeasureDistance] = useState<number | null>(null);
+
+  // 3D Component Selection & Sidebar states
+  const [selectedComponent, setSelectedComponent] = useState<ComponentStructureData | null>(MODEL_COMPONENTS_DATA[0]);
+  const [isComponentSidebarOpen, setIsComponentSidebarOpen] = useState<boolean>(true);
 
   const measureP1MeshRef = useRef<any>(null);
   const measureP2MeshRef = useRef<any>(null);
@@ -202,6 +381,32 @@ export const RepairBay3D: React.FC<Props> = ({
   const handleClearMeasurement = () => {
     clearMeasurementSilent();
     addLog("STRUCT DIAG // SURFACE CALIPER CLEARED AND RESET TO NOMINAL");
+  };
+
+  const playAnimation = (name: string) => {
+    if (!sceneRef.current) return;
+    const groups = sceneRef.current.animationGroups;
+    if (groups) {
+      groups.forEach(g => {
+        if (g.name === name) {
+          g.start(true); // Loop it
+          setActiveAnimationName(name);
+          addLog(`ANIMATION ENGINE // PLAYING SEQUENCE: [${name.replace("infiltrator_", "").toUpperCase()}]`);
+        } else {
+          g.stop();
+        }
+      });
+    }
+  };
+
+  const stopAllAnimations = () => {
+    if (!sceneRef.current) return;
+    const groups = sceneRef.current.animationGroups;
+    if (groups) {
+      groups.forEach(g => g.stop());
+    }
+    setActiveAnimationName(null);
+    addLog(`ANIMATION ENGINE // ALL SEQUENCES HALTED`);
   };
 
   useEffect(() => {
@@ -1068,10 +1273,10 @@ export const RepairBay3D: React.FC<Props> = ({
     scene.clearColor = new Color4(0.01, 0.02, 0.04, 1.0); // Dark matte space theme
     sceneRef.current = scene;
 
-    // Pre-load the Stealth Infiltrator GLB asset via glbLoaderService
-    glbLoaderService.preLoadModel(scene, "cst-ert-stealth-infiltrator-x2-a.glb").then((success) => {
+    // Pre-load the selected GLB asset via glbLoaderService
+    glbLoaderService.preLoadModel(scene, selectedGlbPathRef.current).then((success) => {
       setIsInfiltratorPreloaded(true);
-      addLog(`GLB SYSTEM // PRE-LOAD SEQUENCE COMPLETED: CST-ERT STEALTH INFILTRATOR X2-A [STATUS: READY]`);
+      addLog(`GLB SYSTEM // PRE-LOAD SEQUENCE COMPLETED: ${selectedGlbPathRef.current.toUpperCase()} [STATUS: READY]`);
     }).catch(err => {
       console.error("GLB SYSTEM // Preload failed:", err);
     });
@@ -1092,72 +1297,124 @@ export const RepairBay3D: React.FC<Props> = ({
 
     // Set up pointer down event for model surface measurement picking
     scene.onPointerDown = (evt, pickResult) => {
-      if (!isMeasureModeRef.current) return;
       if (evt.button !== 0) return; // Left click only
       
-      if (pickResult && pickResult.hit && pickResult.pickedPoint) {
-        const point = pickResult.pickedPoint;
-        const currentPoints = measurePointsRef.current;
+      if (isMeasureModeRef.current) {
+        if (pickResult && pickResult.hit && pickResult.pickedPoint) {
+          const point = pickResult.pickedPoint;
+          const currentPoints = measurePointsRef.current;
 
-        if (!currentPoints.p1 || (currentPoints.p1 && currentPoints.p2)) {
-          // Setting the first point - dispose old structures
-          if (measureP1MeshRef.current) {
-            measureP1MeshRef.current.dispose();
-            measureP1MeshRef.current = null;
+          if (!currentPoints.p1 || (currentPoints.p1 && currentPoints.p2)) {
+            // Setting the first point - dispose old structures
+            if (measureP1MeshRef.current) {
+              measureP1MeshRef.current.dispose();
+              measureP1MeshRef.current = null;
+            }
+            if (measureP2MeshRef.current) {
+              measureP2MeshRef.current.dispose();
+              measureP2MeshRef.current = null;
+            }
+            if (measureLineMeshRef.current) {
+              measureLineMeshRef.current.dispose();
+              measureLineMeshRef.current = null;
+            }
+
+            // Generate point A anchor visual sphere
+            const sphere1 = MeshBuilder.CreateSphere("measure_anchor_p1", { diameter: 0.14 }, scene);
+            sphere1.position.copyFrom(point);
+            const mat1 = new StandardMaterial("measure_anchor_p1_mat", scene);
+            mat1.emissiveColor = new Color3(0.0, 1.0, 0.85); // Neon cyan
+            mat1.disableLighting = true;
+            sphere1.material = mat1;
+            measureP1MeshRef.current = sphere1;
+
+            setMeasurePoints({ p1: point, p2: null });
+            setMeasureDistance(null);
+            addLog(`STRUCT DIAG // CALIPER POINT A DEPLOYED AT [X: ${point.x.toFixed(2)}, Y: ${point.y.toFixed(2)}, Z: ${point.z.toFixed(2)}]`);
+          } else {
+            // Setting the second point - dispose old second point/line
+            if (measureP2MeshRef.current) {
+              measureP2MeshRef.current.dispose();
+              measureP2MeshRef.current = null;
+            }
+            if (measureLineMeshRef.current) {
+              measureLineMeshRef.current.dispose();
+              measureLineMeshRef.current = null;
+            }
+
+            // Generate point B anchor visual sphere
+            const sphere2 = MeshBuilder.CreateSphere("measure_anchor_p2", { diameter: 0.14 }, scene);
+            sphere2.position.copyFrom(point);
+            const mat2 = new StandardMaterial("measure_anchor_p2_mat", scene);
+            mat2.emissiveColor = new Color3(1.0, 0.15, 0.55); // Neon pink
+            mat2.disableLighting = true;
+            sphere2.material = mat2;
+            measureP2MeshRef.current = sphere2;
+
+            // Generate connect line
+            const line = MeshBuilder.CreateLines("measure_span_line", { points: [currentPoints.p1, point] }, scene);
+            line.color = new Color3(0.0, 0.9, 1.0); // Bright cyan connector line
+            measureLineMeshRef.current = line;
+
+            const dist = Vector3.Distance(currentPoints.p1, point);
+            const auDist = dist * 5.4; // 1 unit = 5.4 Abyssum Units
+
+            setMeasurePoints({ p1: currentPoints.p1, p2: point });
+            setMeasureDistance(auDist);
+            addLog(`STRUCT DIAG // CALIPER POINT B DEPLOYED AT [X: ${point.x.toFixed(2)}, Y: ${point.y.toFixed(2)}, Z: ${point.z.toFixed(2)}]`);
+            addLog(`STRUCT DIAG // ESTIMATED SPAN CORE: [${auDist.toFixed(2)} AU]`);
           }
-          if (measureP2MeshRef.current) {
-            measureP2MeshRef.current.dispose();
-            measureP2MeshRef.current = null;
+        }
+      } else {
+        // Component selection mode (Measure mode is OFF)
+        if (pickResult && pickResult.hit && pickResult.pickedMesh) {
+          const pickedMesh = pickResult.pickedMesh;
+          const pickedName = pickedMesh.name;
+          
+          // Try to find the matching component in our data
+          const matched = MODEL_COMPONENTS_DATA.find(comp => 
+            pickedName.toLowerCase().includes(comp.meshNamePattern.toLowerCase()) || 
+            comp.meshNamePattern.toLowerCase().includes(pickedName.toLowerCase())
+          );
+          
+          if (matched) {
+            setSelectedComponent(matched);
+            setIsComponentSidebarOpen(true);
+            addLog(`STRUCT DIAG // LOCKED DETECTOR CHANNELS ON COMPONENT: [${matched.name.toUpperCase()}]`);
+            
+            // Flash mesh briefly as visual feedback!
+            const originalMaterial = pickedMesh.material;
+            if (originalMaterial && 'emissiveColor' in originalMaterial) {
+              const standardMat = originalMaterial as StandardMaterial;
+              const origEmissive = standardMat.emissiveColor.clone();
+              
+              // Set to bright highlight
+              standardMat.emissiveColor = new Color3(0, 1, 1);
+              
+              // Reset after 250ms
+              setTimeout(() => {
+                standardMat.emissiveColor = origEmissive;
+              }, 250);
+            }
+          } else {
+            // Check if it's part of the procedural cockpit model or other meshes
+            const cleanMeshName = pickedName.replace('infiltrator_', '').replace('_primitive', '').toUpperCase();
+            if (cleanMeshName && !cleanMeshName.includes('GROUND') && !cleanMeshName.includes('LIGHT') && !cleanMeshName.includes('PLANE')) {
+              const generated: ComponentStructureData = {
+                id: pickedName,
+                name: cleanMeshName,
+                material: 'Carbon-Silicon Crystal Alloy',
+                integrity: Math.floor(Math.random() * 20) + 80, // 80 to 100
+                status: Math.random() > 0.15 ? 'Stable' : 'Degraded',
+                notes: `Procedural scanner lock achieved for sub-assembly '${pickedName}'. Resonance frequency stable.`,
+                resonance: `${(Math.random() * 300 + 40).toFixed(1)} Hz`,
+                meshNamePattern: pickedName
+              };
+              setSelectedComponent(generated);
+              setIsComponentSidebarOpen(true);
+              addLog(`STRUCT DIAG // LOCKED DETECTOR CHANNELS ON COMPONENT: [${cleanMeshName}]`);
+            }
           }
-          if (measureLineMeshRef.current) {
-            measureLineMeshRef.current.dispose();
-            measureLineMeshRef.current = null;
-          }
-
-          // Generate point A anchor visual sphere
-          const sphere1 = MeshBuilder.CreateSphere("measure_anchor_p1", { diameter: 0.14 }, scene);
-          sphere1.position.copyFrom(point);
-          const mat1 = new StandardMaterial("measure_anchor_p1_mat", scene);
-          mat1.emissiveColor = new Color3(0.0, 1.0, 0.85); // Neon cyan
-          mat1.disableLighting = true;
-          sphere1.material = mat1;
-          measureP1MeshRef.current = sphere1;
-
-          setMeasurePoints({ p1: point, p2: null });
-          setMeasureDistance(null);
-          addLog(`STRUCT DIAG // CALIPER POINT A DEPLOYED AT [X: ${point.x.toFixed(2)}, Y: ${point.y.toFixed(2)}, Z: ${point.z.toFixed(2)}]`);
-        } else {
-          // Setting the second point - dispose old second point/line
-          if (measureP2MeshRef.current) {
-            measureP2MeshRef.current.dispose();
-            measureP2MeshRef.current = null;
-          }
-          if (measureLineMeshRef.current) {
-            measureLineMeshRef.current.dispose();
-            measureLineMeshRef.current = null;
-          }
-
-          // Generate point B anchor visual sphere
-          const sphere2 = MeshBuilder.CreateSphere("measure_anchor_p2", { diameter: 0.14 }, scene);
-          sphere2.position.copyFrom(point);
-          const mat2 = new StandardMaterial("measure_anchor_p2_mat", scene);
-          mat2.emissiveColor = new Color3(1.0, 0.15, 0.55); // Neon pink
-          mat2.disableLighting = true;
-          sphere2.material = mat2;
-          measureP2MeshRef.current = sphere2;
-
-          // Generate connect line
-          const line = MeshBuilder.CreateLines("measure_span_line", { points: [currentPoints.p1, point] }, scene);
-          line.color = new Color3(0.0, 0.9, 1.0); // Bright cyan connector line
-          measureLineMeshRef.current = line;
-
-          const dist = Vector3.Distance(currentPoints.p1, point);
-          const auDist = dist * 5.4; // 1 unit = 5.4 Abyssum Units
-
-          setMeasurePoints({ p1: currentPoints.p1, p2: point });
-          setMeasureDistance(auDist);
-          addLog(`STRUCT DIAG // CALIPER POINT B DEPLOYED AT [X: ${point.x.toFixed(2)}, Y: ${point.y.toFixed(2)}, Z: ${point.z.toFixed(2)}]`);
-          addLog(`STRUCT DIAG // ESTIMATED SPAN CORE: [${auDist.toFixed(2)} AU]`);
         }
       }
     };
@@ -1788,10 +2045,32 @@ export const RepairBay3D: React.FC<Props> = ({
           wheel.material = wheelMat;
         });
       } else {
-        // Instantiate the pre-loaded Stealth Infiltrator X2-A
-        const infiltrator = glbLoaderService.instantiateModel(scene, "cst-ert-stealth-infiltrator-x2-a.glb", carriageRoot);
+        // Instantiate the pre-loaded GLB model
+        const infiltrator = glbLoaderService.instantiateModel(scene, selectedGlbPathRef.current, carriageRoot);
         infiltrator.position.set(0, 0.05, 0);
         infiltrator.scaling.set(1.5, 1.5, 1.5);
+
+        // Auto-play / Scan for animations
+        setTimeout(() => {
+          if (scene && scene.animationGroups && scene.animationGroups.length > 0) {
+            scene.animationGroups.forEach(g => g.stop());
+            const animNames = scene.animationGroups.map(g => g.name);
+            setAvailableAnimations(animNames);
+            const idleAnim = scene.animationGroups.find(g => g.name.toLowerCase().includes("idle"));
+            if (idleAnim) {
+              idleAnim.start(true);
+              setActiveAnimationName(idleAnim.name);
+              addLog(`ANIMATION ENGINE // AUTO-PLAYED LOOP: [${idleAnim.name.toUpperCase()}]`);
+            } else {
+              scene.animationGroups[0].start(true);
+              setActiveAnimationName(scene.animationGroups[0].name);
+              addLog(`ANIMATION ENGINE // AUTO-PLAYED LOOP: [${scene.animationGroups[0].name.toUpperCase()}]`);
+            }
+          } else {
+            setAvailableAnimations([]);
+            setActiveAnimationName(null);
+          }
+        }, 120);
 
         // High-Tech Internal Stealth Vector Core (visible only during Exploded View)
         const coreDiag = MeshBuilder.CreateBox("internalCoreDiagBox", { width: 0.6, height: 0.4, depth: 1.1 }, scene);
@@ -2127,7 +2406,7 @@ export const RepairBay3D: React.FC<Props> = ({
           if (sensorNeedle) sensorNeedle.position.z = 0.85 + explodedLerp * 0.9;
 
           // Support generic GLB model children displacement as a fallback
-          const glbRoot = scene.getTransformNodeByName("glb_root_cst-ert-stealth-infiltrator-x2-a.glb");
+          const glbRoot = scene.getTransformNodeByName(`glb_root_${selectedGlbPathRef.current}`);
           if (glbRoot) {
             glbRoot.getChildMeshes().forEach((mesh) => {
               if (mesh.name !== "internalCoreDiagBox" && mesh.name !== "internalCoreReactorSphere") {
@@ -3076,158 +3355,380 @@ export const RepairBay3D: React.FC<Props> = ({
                   </button>
                 </div>
               </div>
+
+              {/* Component Spectrometry Scanner Sidebar Overlay */}
+              {isComponentSidebarOpen && (
+                <div className="absolute top-14 right-3 bottom-3 w-[270px] bg-black/92 backdrop-blur-md border border-zinc-800 rounded-sm flex flex-col z-20 shadow-[0_12px_36px_rgba(0,0,0,0.92)] overflow-hidden pointer-events-auto font-mono text-left">
+                  {/* Sidebar Header */}
+                  <div className="bg-zinc-950 px-2.5 py-2 border-b border-zinc-800 flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-[8px] font-black tracking-widest text-cyan-400">
+                      <Activity size={9} className="text-cyan-400 animate-pulse" />
+                      <span>COMPONENT SPECTROMETRY</span>
+                    </div>
+                    <button 
+                      type="button"
+                      onClick={() => setIsComponentSidebarOpen(false)} 
+                      className="text-zinc-500 hover:text-white p-0.5 cursor-pointer transition-colors"
+                      title="Collapse Sidebar"
+                    >
+                      <X size={9} />
+                    </button>
+                  </div>
+
+                  {/* Components List */}
+                  <div className="bg-zinc-950/40 text-[6.5px] font-bold text-zinc-500 uppercase tracking-widest px-2.5 pt-2 pb-1 border-b border-zinc-900 flex justify-between">
+                    <span>// DETECTED MODULES</span>
+                    <span className="text-[5.5px] text-zinc-650 tracking-normal">// CLICK 3D MESH OR NAME</span>
+                  </div>
+                  
+                  <div className="flex-1 overflow-y-auto no-scrollbar divide-y divide-zinc-900/60 bg-zinc-950/20 max-h-[175px] lg:max-h-[220px]">
+                    {MODEL_COMPONENTS_DATA.map((comp) => {
+                      const isSelected = selectedComponent?.id === comp.id;
+                      return (
+                        <div 
+                          key={comp.id}
+                          onClick={() => {
+                            setSelectedComponent(comp);
+                            addLog(`STRUCT DIAG // LOCK ON COMPONENT: [${comp.name.toUpperCase()}]`);
+                          }}
+                          className={`px-2.5 py-1.5 flex items-center justify-between text-[7.5px] cursor-pointer transition-all duration-150 border-l ${
+                            isSelected 
+                              ? "bg-cyan-950/30 border-l-cyan-400 text-cyan-200 shadow-[inset_3px_0_12px_rgba(6,182,212,0.05)]" 
+                              : "hover:bg-zinc-900/40 border-l-transparent text-zinc-400 hover:text-zinc-200"
+                          }`}
+                        >
+                          <span className="truncate max-w-[170px] uppercase font-bold">{comp.name}</span>
+                          <div className="flex items-center gap-1 flex-shrink-0 font-bold">
+                            <span className={`text-[6.5px] ${comp.status === 'Stable' ? 'text-emerald-500' : 'text-amber-500 animate-pulse'}`}>
+                              {comp.status}
+                            </span>
+                            {comp.status === 'Stable' ? (
+                              <ShieldCheck size={8} className="text-emerald-400" />
+                            ) : (
+                              <AlertTriangle size={8} className="text-amber-400 animate-pulse" />
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Component Details Panel */}
+                  {selectedComponent && (
+                    <div className="p-2.5 border-t border-zinc-800 bg-[#020509]/95 flex-1 flex flex-col gap-2 overflow-y-auto no-scrollbar">
+                      <div>
+                        <div className="text-[6px] text-zinc-500 tracking-wider uppercase font-bold mb-0.5">// READOUT SOURCE FILE</div>
+                        <h4 className="text-[9.5px] font-black uppercase text-white tracking-wide leading-tight">{selectedComponent.name}</h4>
+                      </div>
+
+                      {/* Integrity bar */}
+                      <div className="flex flex-col">
+                        <div className="flex justify-between items-center text-[7px] font-bold text-zinc-400 uppercase">
+                          <span>Structural Integrity:</span>
+                          <span className={selectedComponent.status === 'Stable' ? 'text-emerald-400' : 'text-amber-400 animate-pulse font-black'}>
+                            {selectedComponent.integrity}%
+                          </span>
+                        </div>
+                        <div className="w-full h-1 bg-zinc-900 border border-zinc-800 rounded-none overflow-hidden relative mt-1">
+                          <motion.div 
+                            initial={{ width: 0 }}
+                            animate={{ width: `${selectedComponent.integrity}%` }}
+                            transition={{ duration: 0.4 }}
+                            className={`h-full ${
+                              selectedComponent.status === 'Stable' 
+                                ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' 
+                                : 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]'
+                            }`}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Specs */}
+                      <div className="flex flex-col gap-1 bg-zinc-950/75 p-1.5 border border-zinc-900 rounded-sm">
+                        <div className="flex justify-between text-[6.5px] font-bold">
+                          <span className="text-zinc-500 uppercase">Material Composition:</span>
+                          <span className="text-zinc-300 uppercase text-right max-w-[120px] truncate" title={selectedComponent.material}>
+                            {selectedComponent.material}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-[6.5px] font-bold">
+                          <span className="text-zinc-500 uppercase">Resonance Signature:</span>
+                          <span className="text-cyan-400 text-right font-black">{selectedComponent.resonance}</span>
+                        </div>
+                      </div>
+
+                      {/* Description notes */}
+                      <div className="flex flex-col gap-1 flex-1">
+                        <div className="text-[6px] text-zinc-500 tracking-wider uppercase font-bold">// DAMAGE ANALYSIS</div>
+                        <p className="text-[7px] text-zinc-300 leading-normal bg-zinc-950/30 p-1.5 border border-dashed border-zinc-900/80 rounded-sm uppercase text-left flex-1">
+                          {selectedComponent.notes}
+                        </p>
+                      </div>
+
+                      {/* Internal Core Exploded View Reminder */}
+                      {(selectedComponent.id === 'internal_core' || selectedComponent.id === 'plasma_reactor') && !isExplodedView && (
+                        <div className="text-[6.5px] text-amber-500 animate-pulse font-bold border border-amber-900/30 bg-amber-950/15 p-1 text-center uppercase tracking-wider rounded-sm">
+                          ⚠️ ACTIVATE EXPLODED VIEW TO LOCATE INTERNAL CORE MESH
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Sidebar Trigger Button (when closed) */}
+              {!isComponentSidebarOpen && (
+                <button
+                  type="button"
+                  onClick={() => setIsComponentSidebarOpen(true)}
+                  className="absolute top-14 right-3 z-20 px-2 py-1.5 bg-black/92 hover:bg-zinc-900 border border-zinc-800 hover:border-cyan-800 text-zinc-300 hover:text-cyan-400 font-mono text-[7px] font-black uppercase tracking-wider flex items-center gap-1 shadow-lg transition-all active:scale-95 cursor-pointer rounded-sm"
+                  title="Open Component Spectrometry Scanner"
+                >
+                  <Activity size={8} className="animate-pulse text-cyan-400" />
+                  <span>🛰️ COMPONENT SCANNER</span>
+                </button>
+              )}
             </div>
 
             {/* Interactive Control Deck (Guttered directly at the bottom in the hologram housing) */}
-            <div className="relative z-10 bg-zinc-950/90 border border-zinc-850 p-3 rounded-none flex flex-col md:flex-row gap-3 items-center">
-              
-              {/* Offset Positioner Slider */}
-              <div className="flex-1 w-full flex flex-col gap-1.5">
-                <div className="flex justify-between text-[8px] font-mono font-bold text-zinc-400 uppercase tracking-widest leading-none">
-                  <span className="flex items-center gap-1">
-                    ⚙️ COUPLING OFFSETS CALIBER
-                  </span>
-                  <span className="text-cyan-400">{transitScrub === 0 ? "DEAD CALIBRATED (LOCKED)" : `${(transitScrub * 3.5).toFixed(1)}m OFFSET`}</span>
-                </div>
-                
-                <div className="flex items-center gap-2">
-                  <input 
-                    type="range"
-                    min="-3.5"
-                    max="3.5"
-                    step="0.05"
-                    value={transitScrub}
-                    disabled={autoPatrol}
-                    onChange={(e) => {
-                      let val = parseFloat(e.target.value);
-                      if (snapToGrid === '15') {
-                        val = Math.round(val / 0.5) * 0.5;
-                      } else if (snapToGrid === '45') {
-                        val = Math.round(val / 1.5) * 1.5;
-                      }
-                      setTransitScrub(val);
-                    }}
-                    className="flex-1 h-1 bg-zinc-900 rounded-none appearance-none cursor-pointer accent-cyan-400 disabled:opacity-30 disabled:cursor-not-allowed"
-                  />
-                  
-                  <button
-                    onClick={() => setAutoPatrol(!autoPatrol)}
-                    className={`px-2 py-1 rounded-sm text-[7.5px] font-mono font-bold tracking-widest uppercase cursor-pointer border flex items-center gap-1 transition-all ${
-                      autoPatrol 
-                        ? "bg-purple-950/20 border-purple-500/40 text-purple-300"
-                        : "bg-zinc-950 border-zinc-800 text-zinc-500 hover:text-white"
-                    }`}
-                    title={autoPatrol ? "Pause automatic train movement along rails" : "Resume automative rail track patrol movement"}
-                  >
-                    {autoPatrol ? (
-                      <>
-                        <Pause size={8} className="animate-pulse" />
-                        <span>AUTO</span>
-                      </>
-                    ) : (
-                      <>
-                        <Play size={8} />
-                        <span>MANUAL</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              {/* Direct Weld Deployers */}
-              <div className="w-full md:w-auto shrink-0 flex items-center justify-end gap-2.5">
-                {/* Dynamic 3D Model Sleeve Switcher */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    const nextModel = cockpitModel === 'train' ? 'infiltrator' : 'train';
-                    setCockpitModel(nextModel);
-                    addLog(`GLB SYSTEM // SWITCHING ACTIVE CHASSIS SCHEMATIC TO: [${nextModel.toUpperCase()}]`);
-                    
-                    // Trigger dynamic rebuild of the cockpit 3D meshes
-                    if (typeof (window as any).__rebuildCockpitMesh === 'function') {
-                      setTimeout(() => {
-                        (window as any).__rebuildCockpitMesh();
-                      }, 10);
-                    }
-                  }}
-                  className={`py-1.5 px-3 font-mono text-[8.5px] font-black uppercase tracking-widest rounded-sm flex items-center justify-center gap-1 transition-all active:scale-98 cursor-pointer ${
-                    cockpitModel === 'infiltrator'
-                      ? "bg-purple-950/40 border border-purple-500/60 text-purple-300 shadow-[0_0_12px_rgba(168,85,247,0.25)]"
-                      : "bg-zinc-900 hover:bg-zinc-850 border border-zinc-700 text-zinc-350"
-                  }`}
-                  title="Switch between the heavy Freight Cargo Chassis and the high-fidelity preloaded Stealth Infiltrator X2-A model"
-                >
-                  <Layers size={10} className={cockpitModel === 'infiltrator' ? "animate-pulse text-purple-400" : "text-zinc-500"} />
-                  <span>
-                    {cockpitModel === 'infiltrator' ? "🛰️ STEALTH INFILTRATOR" : "🛰️ DEF CARGO ARRAY"}
-                  </span>
-                </button>
-
-                {/* Exploded View Toggle */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsExplodedView(!isExplodedView);
-                    addLog(`STRUCT DIAG // EXPLODED STRUCTURAL MATRIX: [${!isExplodedView ? "EXPANDED FOR INSPECTION" : "COLLAPSED TO NOMINAL"}]`);
-                  }}
-                  className={`py-1.5 px-3 font-mono text-[8.5px] font-black uppercase tracking-widest rounded-sm flex items-center justify-center gap-1.5 transition-all active:scale-98 cursor-pointer ${
-                    isExplodedView
-                      ? "bg-cyan-950/40 border border-cyan-500/60 text-cyan-300 shadow-[0_0_12px_rgba(6,182,212,0.25)]"
-                      : "bg-zinc-900 hover:bg-zinc-850 border border-zinc-700 text-zinc-350"
-                  }`}
-                  title="Toggle Exploded View to inspect internal components and power core structures"
-                >
-                  <Wrench size={10} className={isExplodedView ? "animate-pulse text-cyan-400" : "text-zinc-500"} />
-                  <span>
-                    {isExplodedView ? "💥 EXPLODED: ON" : "💥 EXPLODED VIEW"}
-                  </span>
-                </button>
-
-                {/* Custom Coaxial Lance Forge trigger */}
-                <button
-                  onClick={() => setIsLanceModalOpen(true)}
-                  className="py-1.5 px-3 bg-amber-950/20 hover:bg-amber-950/45 border border-amber-500/40 hover:border-amber-400 text-amber-300 font-mono text-[8.5px] font-black uppercase tracking-widest rounded-sm flex items-center justify-center gap-1 transition-all shadow-[0_0_12px_rgba(245,158,11,0.12)] active:scale-98 cursor-pointer"
-                >
-                  <Flame size={10} className="animate-pulse text-amber-400" />
-                  <span>LANCE FORGE</span>
-                </button>
-
-                {repairStep === 'weld-locked' || !proximityActive ? (
-                  <div className="text-right flex flex-col items-end pr-1">
-                    <span className="text-[6.5px] font-mono text-zinc-500 uppercase tracking-widest block leading-none">
-                      WELD LOCK DETECTOR
+            <div className="relative z-10 bg-zinc-950/90 border border-zinc-850 p-3 rounded-none flex flex-col gap-3">
+              {/* Row 1: Calibration and Deployment */}
+              <div className="flex flex-col md:flex-row gap-3 items-center w-full">
+                {/* Offset Positioner Slider */}
+                <div className="flex-1 w-full flex flex-col gap-1.5">
+                  <div className="flex justify-between text-[8px] font-mono font-bold text-zinc-400 uppercase tracking-widest leading-none">
+                    <span className="flex items-center gap-1">
+                      ⚙️ COUPLING OFFSETS CALIBER
                     </span>
-                    <span className="text-[7.5px] font-mono text-yellow-500/85 uppercase font-bold tracking-wider flex items-center gap-0.5 mt-0.5 leading-none">
-                      <AlertTriangle size={9} className="text-yellow-500 animate-pulse" />
-                      ALIGN CENTER ON RING
-                    </span>
+                    <span className="text-cyan-400">{transitScrub === 0 ? "DEAD CALIBRATED (LOCKED)" : `${(transitScrub * 3.5).toFixed(1)}m OFFSET`}</span>
                   </div>
-                ) : (
-                  <>
-                    {repairStep === 'ready' ? (
-                      <button
-                        onClick={resetDockPlatform}
-                        className="py-1.5 px-3 bg-emerald-950/20 hover:bg-emerald-950/40 border border-emerald-500/40 text-emerald-300 font-mono text-[8.5px] font-black uppercase tracking-widest rounded-sm flex items-center justify-center gap-1 transition-colors cursor-pointer"
-                      >
-                        <RefreshCw size={10} className="animate-spin-slow" />
-                        <span>RESET BRIDGE NOMINAL</span>
-                      </button>
-                    ) : (
-                      <button
-                        onClick={startWeldProcedure}
-                        disabled={repairStep === 'welding'}
-                        className="py-1.5 px-3 bg-cyan-950/30 hover:bg-cyan-950/60 border border-cyan-500/40 hover:border-cyan-400 text-cyan-300 font-mono text-[8.5px] font-black uppercase tracking-widest rounded-sm flex items-center justify-center gap-1 transition-all shadow-[0_0_15px_rgba(6,182,212,0.15)] active:scale-98 disabled:opacity-45 cursor-pointer animate-pulse"
-                      >
-                        <Wrench size={10} className={repairStep === 'welding' ? "animate-spin" : ""} />
-                        <span>
-                          {repairStep === 'welding' ? "WELDING..." : "DEPLOY REPAIR WELD"}
-                        </span>
-                      </button>
-                    )}
-                  </>
-                )}
+                  
+                  <div className="flex items-center gap-2">
+                    <input 
+                      type="range"
+                      min="-3.5"
+                      max="3.5"
+                      step="0.05"
+                      value={transitScrub}
+                      disabled={autoPatrol}
+                      onChange={(e) => {
+                        let val = parseFloat(e.target.value);
+                        if (snapToGrid === '15') {
+                          val = Math.round(val / 0.5) * 0.5;
+                        } else if (snapToGrid === '45') {
+                          val = Math.round(val / 1.5) * 1.5;
+                        }
+                        setTransitScrub(val);
+                      }}
+                      className="flex-1 h-1 bg-zinc-900 rounded-none appearance-none cursor-pointer accent-cyan-400 disabled:opacity-30 disabled:cursor-not-allowed"
+                    />
+                    
+                    <button
+                      onClick={() => setAutoPatrol(!autoPatrol)}
+                      className={`px-2 py-1 rounded-sm text-[7.5px] font-mono font-bold tracking-widest uppercase cursor-pointer border flex items-center gap-1 transition-all ${
+                        autoPatrol 
+                          ? "bg-purple-950/20 border-purple-500/40 text-purple-300"
+                          : "bg-zinc-950 border-zinc-800 text-zinc-500 hover:text-white"
+                      }`}
+                      title={autoPatrol ? "Pause automatic train movement along rails" : "Resume automative rail track patrol movement"}
+                    >
+                      {autoPatrol ? (
+                        <>
+                          <Pause size={8} className="animate-pulse" />
+                          <span>AUTO</span>
+                        </>
+                      ) : (
+                        <>
+                          <Play size={8} />
+                          <span>MANUAL</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Direct Weld Deployers */}
+                <div className="w-full md:w-auto shrink-0 flex items-center justify-end gap-2.5">
+                  {/* Dynamic 3D Model Sleeve Switcher */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const nextModel = cockpitModel === 'train' ? 'infiltrator' : 'train';
+                      setCockpitModel(nextModel);
+                      addLog(`GLB SYSTEM // SWITCHING ACTIVE CHASSIS SCHEMATIC TO: [${nextModel.toUpperCase()}]`);
+                      
+                      // Trigger dynamic rebuild of the cockpit 3D meshes
+                      if (typeof (window as any).__rebuildCockpitMesh === 'function') {
+                        setTimeout(() => {
+                          (window as any).__rebuildCockpitMesh();
+                        }, 10);
+                      }
+                    }}
+                    className={`py-1.5 px-3 font-mono text-[8.5px] font-black uppercase tracking-widest rounded-sm flex items-center justify-center gap-1 transition-all active:scale-98 cursor-pointer ${
+                      cockpitModel === 'infiltrator'
+                        ? "bg-purple-950/40 border border-purple-500/60 text-purple-300 shadow-[0_0_12px_rgba(168,85,247,0.25)]"
+                        : "bg-zinc-900 hover:bg-zinc-850 border border-zinc-700 text-zinc-350"
+                    }`}
+                    title="Switch between the heavy Freight Cargo Chassis and the high-fidelity preloaded Stealth Infiltrator X2-A model"
+                  >
+                    <Layers size={10} className={cockpitModel === 'infiltrator' ? "animate-pulse text-purple-400" : "text-zinc-500"} />
+                    <span>
+                      {cockpitModel === 'infiltrator' ? "🛰️ STEALTH INFILTRATOR" : "🛰️ DEF CARGO ARRAY"}
+                    </span>
+                  </button>
+
+                  {/* Exploded View Toggle */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsExplodedView(!isExplodedView);
+                      addLog(`STRUCT DIAG // EXPLODED STRUCTURAL MATRIX: [${!isExplodedView ? "EXPANDED FOR INSPECTION" : "COLLAPSED TO NOMINAL"}]`);
+                    }}
+                    className={`py-1.5 px-3 font-mono text-[8.5px] font-black uppercase tracking-widest rounded-sm flex items-center justify-center gap-1.5 transition-all active:scale-98 cursor-pointer ${
+                      isExplodedView
+                        ? "bg-cyan-950/40 border border-cyan-500/60 text-cyan-300 shadow-[0_0_12px_rgba(6,182,212,0.25)]"
+                        : "bg-zinc-900 hover:bg-zinc-850 border border-zinc-700 text-zinc-350"
+                    }`}
+                    title="Toggle Exploded View to inspect internal components and power core structures"
+                  >
+                    <Wrench size={10} className={isExplodedView ? "animate-pulse text-cyan-400" : "text-zinc-500"} />
+                    <span>
+                      {isExplodedView ? "💥 EXPLODED: ON" : "💥 EXPLODED VIEW"}
+                    </span>
+                  </button>
+
+                  {/* Custom Coaxial Lance Forge trigger */}
+                  <button
+                    onClick={() => setIsLanceModalOpen(true)}
+                    className="py-1.5 px-3 bg-amber-950/20 hover:bg-amber-950/45 border border-amber-500/40 hover:border-amber-400 text-amber-300 font-mono text-[8.5px] font-black uppercase tracking-widest rounded-sm flex items-center justify-center gap-1 transition-all shadow-[0_0_12px_rgba(245,158,11,0.12)] active:scale-98 cursor-pointer"
+                  >
+                    <Flame size={10} className="animate-pulse text-amber-400" />
+                    <span>LANCE FORGE</span>
+                  </button>
+
+                  {repairStep === 'weld-locked' || !proximityActive ? (
+                    <div className="text-right flex flex-col items-end pr-1">
+                      <span className="text-[6.5px] font-mono text-zinc-500 uppercase tracking-widest block leading-none">
+                        WELD LOCK DETECTOR
+                      </span>
+                      <span className="text-[7.5px] font-mono text-yellow-500/85 uppercase font-bold tracking-wider flex items-center gap-0.5 mt-0.5 leading-none">
+                        <AlertTriangle size={9} className="text-yellow-500 animate-pulse" />
+                        ALIGN CENTER ON RING
+                      </span>
+                    </div>
+                  ) : (
+                    <>
+                      {repairStep === 'ready' ? (
+                        <button
+                          onClick={resetDockPlatform}
+                          className="py-1.5 px-3 bg-emerald-950/20 hover:bg-emerald-950/40 border border-emerald-500/40 text-emerald-300 font-mono text-[8.5px] font-black uppercase tracking-widest rounded-sm flex items-center justify-center gap-1 transition-colors cursor-pointer"
+                        >
+                          <RefreshCw size={10} className="animate-spin-slow" />
+                          <span>RESET BRIDGE NOMINAL</span>
+                        </button>
+                      ) : (
+                        <button
+                          onClick={startWeldProcedure}
+                          disabled={repairStep === 'welding'}
+                          className="py-1.5 px-3 bg-cyan-950/30 hover:bg-cyan-950/60 border border-cyan-500/40 hover:border-cyan-400 text-cyan-300 font-mono text-[8.5px] font-black uppercase tracking-widest rounded-sm flex items-center justify-center gap-1 transition-all shadow-[0_0_15px_rgba(6,182,212,0.15)] active:scale-98 disabled:opacity-45 cursor-pointer animate-pulse"
+                        >
+                          <Wrench size={10} className={repairStep === 'welding' ? "animate-spin" : ""} />
+                          <span>
+                            {repairStep === 'welding' ? "WELDING..." : "DEPLOY REPAIR WELD"}
+                          </span>
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
               </div>
+
+              {/* Row 2: GLB Model & Animation Controller (Displayed when Stealth Infiltrator / GLB Model view is selected) */}
+              {cockpitModel === 'infiltrator' && (
+                <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between pt-2.5 border-t border-zinc-900/60 w-full animate-fade-in">
+                  {/* Model Selector */}
+                  <div className="flex flex-col gap-1 shrink-0">
+                    <span className="text-[6.5px] font-mono text-zinc-500 uppercase tracking-widest leading-none">
+                      3D MODEL SCHEMATIC SOURCE
+                    </span>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedGlbPath("commander-antonio-coldstone-a.glb")}
+                        className={`py-1 px-2 font-mono text-[7.5px] font-bold uppercase tracking-wider rounded-sm transition-all cursor-pointer ${
+                          selectedGlbPath === "commander-antonio-coldstone-a.glb"
+                            ? "bg-purple-950/35 border border-purple-500/50 text-purple-300 shadow-[0_0_8px_rgba(168,85,247,0.15)]"
+                            : "bg-zinc-900/60 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 hover:text-white"
+                        }`}
+                      >
+                        🎖️ COMMANDER COLDSTONE
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedGlbPath("jump-sequence.glb")}
+                        className={`py-1 px-2 font-mono text-[7.5px] font-bold uppercase tracking-wider rounded-sm transition-all cursor-pointer ${
+                          selectedGlbPath === "jump-sequence.glb"
+                            ? "bg-cyan-950/35 border border-cyan-500/50 text-cyan-300 shadow-[0_0_8px_rgba(6,182,212,0.15)]"
+                            : "bg-zinc-900/60 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 hover:text-white"
+                        }`}
+                      >
+                        🤸 JUMP SEQUENCE
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Animation List */}
+                  <div className="flex-1 w-full flex flex-col gap-1">
+                    <div className="flex justify-between items-center text-[6.5px] font-mono text-zinc-500 uppercase tracking-widest leading-none">
+                      <span>ACTIVE ANIMATION LOOPS</span>
+                      {activeAnimationName ? (
+                        <span className="text-purple-450 font-bold animate-pulse">
+                          PLAYING: {activeAnimationName.replace("infiltrator_", "")}
+                        </span>
+                      ) : (
+                        <span className="text-zinc-600 font-bold">ANIMATION LOOPS HALTED</span>
+                      )}
+                    </div>
+                    
+                    <div className="flex flex-wrap items-center gap-1 mt-0.5">
+                      {availableAnimations.length > 0 ? (
+                        <>
+                          {availableAnimations.map((anim) => {
+                            const displayName = anim.replace("infiltrator_", "");
+                            const isActive = activeAnimationName === anim;
+                            return (
+                              <button
+                                key={anim}
+                                type="button"
+                                onClick={() => playAnimation(anim)}
+                                className={`py-1 px-1.5 font-mono text-[7px] uppercase tracking-wider rounded-sm transition-all cursor-pointer ${
+                                  isActive
+                                    ? "bg-purple-500/20 border border-purple-400 text-purple-200 shadow-[0_0_8px_rgba(168,85,247,0.2)]"
+                                    : "bg-zinc-900/80 hover:bg-zinc-850/80 border border-zinc-800 text-zinc-400 hover:text-zinc-200"
+                                }`}
+                              >
+                                {displayName}
+                              </button>
+                            );
+                          })}
+                          <button
+                            type="button"
+                            onClick={stopAllAnimations}
+                            className="py-1 px-1.5 bg-red-950/20 hover:bg-red-950/40 border border-red-500/30 hover:border-red-500/50 text-red-300 font-mono text-[7px] uppercase tracking-wider rounded-sm transition-all cursor-pointer"
+                            title="Stop all animation groups"
+                          >
+                            ⏹️ HALT
+                          </button>
+                        </>
+                      ) : (
+                        <span className="text-[7px] font-mono text-zinc-500 uppercase italic">
+                          // NO INHERENT SKELETON ANIMATIONS DETECTED IN FALLBACK GRAPHICS
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* INTEGRITY BREACH EMERGENCY GRID PANEL */}

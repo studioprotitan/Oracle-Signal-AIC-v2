@@ -18,12 +18,14 @@ import { AudioVisualizer } from './components/AudioVisualizer';
 import { LoreNetworkGraph } from './components/LoreNetworkGraph';
 import { HeroLandingPage } from './components/HeroLandingPage';
 import { RarityDistributionChart } from './components/RarityDistributionChart';
+import { OracleAILogo } from './components/OracleAILogo';
+import { AshPilotForgeViewer } from './components/AshPilotForgeViewer';
 import { 
   Upload, Sparkles, RefreshCw, Sliders, ArrowUpDown, ChevronRight, Zap, 
   Terminal, ShieldCheck, Eye, EyeOff, Radio, HelpCircle, 
   Download, ShoppingBag, Database, Cpu, ExternalLink, X, FileJson, FileImage, Layers,
   Search, Trash2, History, BookOpen, AlertTriangle, GitCompare, Maximize2, Minimize2, Grid, Box, Magnet,
-  Volume2, VolumeX, Flame, Network, Share2, Info
+  Volume2, VolumeX, Flame, Network, Share2, Info, Activity
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -491,7 +493,7 @@ export function generateOracleIntel(query: string, variant: string): OracleIntel
 }
 
 function App() {
-  const [currentScreen, setCurrentScreen] = useState<'landing' | 'terminal'>('landing');
+  const [currentScreen, setCurrentScreen] = useState<'landing' | 'terminal' | 'forge-viewer'>('landing');
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<AppStatus>('idle');
   const [data, setData] = useState<{ image: GeneratedImage; analysis: AnalysisResult | null } | null>(null);
@@ -503,6 +505,7 @@ function App() {
   const [signalOverride, setSignalOverride] = useState<boolean>(false);
   const [gridFloor, setGridFloor] = useState<boolean>(false);
   const [showHeatmap, setShowHeatmap] = useState<boolean>(false);
+  const [showTacticalGrid, setShowTacticalGrid] = useState<boolean>(false);
   const [isOrthographic, setIsOrthographic] = useState<boolean>(false);
   const [snapToGrid, setSnapToGrid] = useState<'off' | '15' | '45'>('off');
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -2200,9 +2203,19 @@ METADATA SIGNATURE ASSIGNED // ARCHIVIST HUB CONSOLE`;
           <HeroLandingPage 
             key="landing-page" 
             onEnter={() => {
-              setCurrentScreen('terminal');
+              setCurrentScreen('forge-viewer');
               addLog("SYSTEM // NEURAL COMM LINK INITIALIZED. ACCESS DIRECTLY GRANTED.");
             }} 
+          />
+        ) : currentScreen === 'forge-viewer' ? (
+          <AshPilotForgeViewer
+            key="forge-viewer-screen"
+            onBackToConsole={() => {
+              setCurrentScreen('terminal');
+              addLog("SYSTEM // SWITCHING TO MAIN TERMINAL SCANNER CONSOLE.");
+            }}
+            addLog={addLog}
+            addToast={addToast}
           />
         ) : (
           <motion.div 
@@ -2383,6 +2396,18 @@ METADATA SIGNATURE ASSIGNED // ARCHIVIST HUB CONSOLE`;
             >
               <BookOpen size={12} className={isLoreDictOpen ? "text-amber-400 animate-pulse" : "text-amber-500/70"} />
               <span>Lore Glossary</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setCurrentScreen('forge-viewer');
+                addLog("ACCESSING ACTIVE ASH PILOT FORGE COCKPIT");
+              }}
+              className="px-3 py-1.5 bg-zinc-950/80 border border-amber-500/20 text-amber-500/90 hover:text-amber-400 hover:border-amber-500/45 hover:bg-amber-950/15 rounded font-mono text-[10px] tracking-[0.15em] uppercase flex items-center gap-2 cursor-pointer transition-all duration-200"
+              title="Switch to Ash Pilot Forge Cockpit"
+            >
+              <Flame size={12} className="text-amber-500 animate-pulse" />
+              <span>Forge Cockpit</span>
             </button>
 
             <div className="px-3 py-1.5 bg-zinc-950/85 border border-brand-cyan/20 rounded font-mono text-[9px] text-zinc-400 tracking-[0.2em] flex items-center gap-1.5 uppercase">
@@ -3143,6 +3168,7 @@ METADATA SIGNATURE ASSIGNED // ARCHIVIST HUB CONSOLE`;
                         gridFloor={gridFloor} 
                         isOrthographic={isOrthographic}
                         showHeatmap={showHeatmap}
+                        showTacticalGrid={showTacticalGrid}
                       />
                     )}
                   </motion.div>
@@ -3528,6 +3554,37 @@ METADATA SIGNATURE ASSIGNED // ARCHIVIST HUB CONSOLE`;
                     </div>
                     <span className="text-[8px] font-mono text-zinc-500 uppercase tracking-wide leading-relaxed">
                       Generates dynamic low-frequency sonic waves that modulate rhythmically based on the scanned Oracle's rarity score {oracleIntel ? `(${getRarityScoreAndSettings(oracleIntel.rarity).score}%)` : ""}.
+                    </span>
+                  </div>
+
+                  {/* Real-time Tactical Grid Toggle Switch */}
+                  <div className="mt-3.5 pt-3.5 border-t border-white/5 flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-widest flex items-center gap-1.5">
+                        <Activity size={10} className="text-emerald-400 animate-pulse" />
+                        Tactical Grid Overlay
+                      </span>
+                      {/* Interactive toggle switch custom element */}
+                      <button
+                        onClick={() => {
+                          const nextState = !showTacticalGrid;
+                          setShowTacticalGrid(nextState);
+                          addLog(`MONITOR EFFECT: TACTICAL GRID OVERLAY [${nextState ? "ENGAGED" : "OFFLINE"}]`);
+                        }}
+                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border border-zinc-800 transition-colors duration-200 ease-in-out focus:outline-none ${
+                          showTacticalGrid ? 'bg-emerald-950/40 border-emerald-400/50' : 'bg-zinc-950'
+                        }`}
+                        title="Toggle Real-Time Tactical Grid Overlay"
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-3.5 w-3.5 transform rounded-full shadow-lg ring-0 transition duration-200 ease-in-out mt-[2px] ${
+                            showTacticalGrid ? 'translate-x-[18px] bg-emerald-450 glow-emerald shadow-[0_0_10px_rgba(52,211,153,0.7)]' : 'translate-x-[2px] bg-zinc-650'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                    <span className="text-[8px] font-mono text-zinc-500 uppercase tracking-wide leading-relaxed">
+                      Projects a real-time HUD grid matrix complete with yaw/pitch coordinates and multiple fluctuating energy flux tracking indicators.
                     </span>
                   </div>
                 </div>

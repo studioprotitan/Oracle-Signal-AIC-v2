@@ -62,6 +62,7 @@ interface Props {
   gridFloor?: boolean;
   isOrthographic?: boolean;
   showHeatmap?: boolean;
+  showTacticalGrid?: boolean;
 }
 
 export const AugmentedCanvas: React.FC<Props> = ({
@@ -82,9 +83,20 @@ export const AugmentedCanvas: React.FC<Props> = ({
   gridFloor = false,
   isOrthographic = false,
   showHeatmap = false,
+  showTacticalGrid = false,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [pings, setPings] = useState<{ id: number }[]>([]);
+
+  // Dynamic tactical colors for real-time overlays
+  const getTacticalColor = () => {
+    switch (activeVariant) {
+      case 'abyss': return 'rgba(6, 182, 212, ';     // Cyan
+      case 'chronos': return 'rgba(168, 85, 247, ';   // Purple
+      case 'aether': return 'rgba(245, 158, 11, ';    // Amber
+      default: return 'rgba(16, 185, 129, ';          // Emerald Green
+    }
+  };
 
   // Dynamic portal accent colors for the warp vortex overlay
   const getPortalColor = (type: 'ring' | 'accent' | 'glow') => {
@@ -381,6 +393,157 @@ export const AugmentedCanvas: React.FC<Props> = ({
                   <span>0.0M</span>
                   <span>-1.0M</span>
                 </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Real-time Tactical Grid Overlay */}
+          <AnimatePresence>
+            {showTacticalGrid && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.35 }}
+                className="absolute inset-0 pointer-events-none z-18 select-none"
+              >
+                {/* 5x5 Grid Lines */}
+                <div className="absolute inset-0 flex flex-col justify-between p-4 opacity-70">
+                  <div className="absolute inset-x-0 h-[1px]" style={{ top: '20%', backgroundColor: getTacticalColor() + '0.15)' }} />
+                  <div className="absolute inset-x-0 h-[1px]" style={{ top: '40%', backgroundColor: getTacticalColor() + '0.15)' }} />
+                  <div className="absolute inset-x-0 h-[1px]" style={{ top: '60%', backgroundColor: getTacticalColor() + '0.15)' }} />
+                  <div className="absolute inset-x-0 h-[1px]" style={{ top: '80%', backgroundColor: getTacticalColor() + '0.15)' }} />
+
+                  <div className="absolute inset-y-0 w-[1px]" style={{ left: '20%', backgroundColor: getTacticalColor() + '0.15)' }} />
+                  <div className="absolute inset-y-0 w-[1px]" style={{ left: '40%', backgroundColor: getTacticalColor() + '0.15)' }} />
+                  <div className="absolute inset-y-0 w-[1px]" style={{ left: '60%', backgroundColor: getTacticalColor() + '0.15)' }} />
+                  <div className="absolute inset-y-0 w-[1px]" style={{ left: '80%', backgroundColor: getTacticalColor() + '0.15)' }} />
+                </div>
+
+                {/* Grid Intersection Labels & Outer HUD Scales */}
+                <div className="absolute inset-0 flex flex-col justify-between p-3 pointer-events-none font-mono text-[7px]" style={{ color: getTacticalColor() + '0.5)' }}>
+                  {/* Top scale */}
+                  <div className="flex justify-between px-8">
+                    <span>X_GRID_A: 104.2</span>
+                    <span>X_GRID_B: 208.4</span>
+                    <span>X_GRID_C: 312.6</span>
+                    <span>X_GRID_D: 416.8</span>
+                  </div>
+                  {/* Bottom scale */}
+                  <div className="flex justify-between px-8">
+                    <span>YAW_LOCK_01: {Math.sin(frameCount * 0.02).toFixed(4)}</span>
+                    <span>BEARING: 147.25°</span>
+                    <span>GRID_REF: S-550</span>
+                    <span>E_FIELD: SECURE</span>
+                  </div>
+                </div>
+
+                {/* Yaw/Pitch crosshairs at intersections */}
+                {[
+                  { x: '20%', y: '20%', label: 'A1' },
+                  { x: '40%', y: '20%', label: 'A2' },
+                  { x: '60%', y: '20%', label: 'A3' },
+                  { x: '80%', y: '20%', label: 'A4' },
+                  { x: '20%', y: '40%', label: 'B1' },
+                  { x: '80%', y: '40%', label: 'B4' },
+                  { x: '20%', y: '60%', label: 'C1' },
+                  { x: '80%', y: '60%', label: 'C4' },
+                  { x: '20%', y: '80%', label: 'D1' },
+                  { x: '40%', y: '80%', label: 'D2' },
+                  { x: '60%', y: '80%', label: 'D3' },
+                  { x: '80%', y: '80%', label: 'D4' },
+                ].map((pt, i) => (
+                  <div 
+                    key={i} 
+                    className="absolute font-mono text-[6px]" 
+                    style={{ 
+                      left: pt.x, 
+                      top: pt.y, 
+                      transform: 'translate(-50%, -50%)',
+                      color: getTacticalColor() + '0.35)'
+                    }}
+                  >
+                    <span>+</span>
+                    <span className="ml-1 opacity-50">{pt.label}</span>
+                  </div>
+                ))}
+
+                {/* Real-time Dynamic Energy Flux Points */}
+                {[
+                  {
+                    name: 'FLUX_ALPHA',
+                    x: 32,
+                    y: 38,
+                    color: activeVariant === 'abyss' ? 'text-cyan-400' : activeVariant === 'chronos' ? 'text-purple-400' : activeVariant === 'aether' ? 'text-amber-500' : 'text-emerald-400',
+                    border: activeVariant === 'abyss' ? 'border-cyan-500/40' : activeVariant === 'chronos' ? 'border-purple-500/40' : activeVariant === 'aether' ? 'border-amber-500/40' : 'border-emerald-500/40',
+                    bg: activeVariant === 'abyss' ? 'bg-cyan-950/85' : activeVariant === 'chronos' ? 'bg-purple-950/85' : activeVariant === 'aether' ? 'bg-amber-950/85' : 'bg-emerald-950/85',
+                    val: () => (Math.sin(frameCount * 0.05) * 15 + 85).toFixed(1) + '%',
+                    getCoords: () => `X: ${(120 + Math.sin(frameCount * 0.01) * 1.5).toFixed(1)}, Y: ${(340 + Math.cos(frameCount * 0.01) * 1.5).toFixed(1)}`,
+                    barCount: 5
+                  },
+                  {
+                    name: 'FLUX_BETA',
+                    x: 68,
+                    y: 28,
+                    color: activeVariant === 'abyss' ? 'text-cyan-400' : activeVariant === 'chronos' ? 'text-purple-400' : activeVariant === 'aether' ? 'text-amber-500' : 'text-emerald-400',
+                    border: activeVariant === 'abyss' ? 'border-cyan-500/40' : activeVariant === 'chronos' ? 'border-purple-500/40' : activeVariant === 'aether' ? 'border-amber-500/40' : 'border-emerald-500/40',
+                    bg: activeVariant === 'abyss' ? 'bg-cyan-950/85' : activeVariant === 'chronos' ? 'bg-purple-950/85' : activeVariant === 'aether' ? 'bg-amber-950/85' : 'bg-emerald-950/85',
+                    val: () => (Math.cos(frameCount * 0.08) * 12 + 64).toFixed(1) + ' MW',
+                    getCoords: () => `X: ${(542 + Math.cos(frameCount * 0.012) * 2).toFixed(1)}, Y: ${(184 + Math.sin(frameCount * 0.012) * 2).toFixed(1)}`,
+                    barCount: 4
+                  },
+                  {
+                    name: 'FLUX_GAMMA',
+                    x: 48,
+                    y: 72,
+                    color: activeVariant === 'abyss' ? 'text-cyan-400' : activeVariant === 'chronos' ? 'text-purple-400' : activeVariant === 'aether' ? 'text-amber-500' : 'text-emerald-400',
+                    border: activeVariant === 'abyss' ? 'border-cyan-500/40' : activeVariant === 'chronos' ? 'border-purple-500/40' : activeVariant === 'aether' ? 'border-amber-500/40' : 'border-emerald-500/40',
+                    bg: activeVariant === 'abyss' ? 'bg-cyan-950/85' : activeVariant === 'chronos' ? 'bg-purple-950/85' : activeVariant === 'aether' ? 'bg-amber-950/85' : 'bg-emerald-950/85',
+                    val: () => (Math.sin(frameCount * 0.03 + 1.2) * 8 + 42).toFixed(2) + ' kJs',
+                    getCoords: () => `X: ${(310 + Math.sin(frameCount * 0.008) * 1.2).toFixed(1)}, Y: ${(615 + Math.cos(frameCount * 0.008) * 1.2).toFixed(1)}`,
+                    barCount: 3
+                  }
+                ].map((flux, idx) => {
+                  const valStr = flux.val();
+                  const coordsStr = flux.getCoords();
+                  return (
+                    <div 
+                      key={idx} 
+                      className="absolute pointer-events-none"
+                      style={{ left: `${flux.x}%`, top: `${flux.y}%` }}
+                    >
+                      {/* Pulsing focal target point */}
+                      <div className="relative flex items-center justify-center">
+                        <span className="animate-ping absolute inline-flex h-4 w-4 rounded-full opacity-40 animate-pulse" style={{ backgroundColor: getTacticalColor() + '0.6)' }} />
+                        <span className="relative inline-flex rounded-full h-1.5 w-1.5" style={{ backgroundColor: getTacticalColor() + '0.9)' }} />
+                        
+                        {/* Target reticle borders */}
+                        <div className="absolute w-3 h-3 border border-dashed rounded-full animate-spin-slow" style={{ borderColor: getTacticalColor() + '0.7)' }} />
+                      </div>
+
+                      {/* Floating HUD Panel Card */}
+                      <div 
+                        className={`absolute left-4 top-[-20px] ${flux.bg} border ${flux.border} rounded p-1.5 font-mono text-[7px] leading-tight min-w-[85px] shadow-[0_0_10px_rgba(0,0,0,0.5)]`}
+                        style={{ color: getTacticalColor() + '0.9)' }}
+                      >
+                        <div className="font-bold border-b border-white/5 pb-0.5 mb-0.5 flex justify-between items-center">
+                          <span>{flux.name}</span>
+                          <span className="w-1 h-1 bg-current rounded-full animate-pulse" />
+                        </div>
+                        <div>{coordsStr}</div>
+                        <div className="flex justify-between items-center mt-0.5">
+                          <span>VAL:</span>
+                          <span className="font-bold">{valStr}</span>
+                        </div>
+                        <div className="mt-0.5 opacity-85 text-[6px] tracking-tight">
+                          {Array.from({ length: 8 }).map((_, bIdx) => (
+                            <span key={bIdx}>{bIdx < flux.barCount ? '▰' : '▱'}</span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </motion.div>
             )}
           </AnimatePresence>
